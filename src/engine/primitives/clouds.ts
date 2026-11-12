@@ -12,6 +12,7 @@ export interface CloudscapeOptions {
   amount: number
   light: Vec
   direction: 1 | -1
+  anchor?: number
 }
 
 interface Recipe {
@@ -24,6 +25,7 @@ interface Recipe {
 
 const RECIPES: Record<MoodId, Recipe> = {
   golden: { cumulus: [2, 5], streaks: [0, 3], decks: [0, 0], glow: 0.35, veil: 0 },
+  midday: { cumulus: [3, 6], streaks: [0, 1], decks: [0, 0], glow: 0, veil: 0 },
   dusk: { cumulus: [1, 3], streaks: [3, 7], decks: [0, 0], glow: 1, veil: 0 },
   dawn: { cumulus: [1, 4], streaks: [2, 5], decks: [0, 0], glow: 0.8, veil: 0 },
   night: { cumulus: [0, 2], streaks: [0, 2], decks: [0, 0], glow: 0, veil: 0.45 },
@@ -147,7 +149,7 @@ function deck(rng: Rng, period: number, top: number, thickness: number, t: Tones
   }
 }
 
-export function cloudscape(env: Env, rng: Rng, { horizon, amount, light: sunAt, direction }: CloudscapeOptions): Layer[] {
+export function cloudscape(env: Env, rng: Rng, { horizon, amount, light: sunAt, direction, anchor = sunAt[0] }: CloudscapeOptions): Layer[] {
   const period = env.aspect
   const recipe = RECIPES[env.palette.mood]
   const { skyTop, skyHorizon, light, sun, ink } = env.palette.anchors
@@ -176,7 +178,7 @@ export function cloudscape(env: Env, rng: Rng, { horizon, amount, light: sunAt, 
 
   const clusterRng = rng.fork('clusters')
   const clusters = Array.from({ length: clusterRng.int(1, 2) }, () => ({
-    x: sunAt[0] + period * clusterRng.range(0.3, 0.7),
+    x: anchor + period * clusterRng.range(0.3, 0.7),
     altitude: clusterRng.range(0.3, 0.7),
   }))
   const placed: [number, number, number, number][] = []
@@ -208,7 +210,7 @@ export function cloudscape(env: Env, rng: Rng, { horizon, amount, light: sunAt, 
   for (let k = 0, n = count(recipe.streaks, streakRng); k < n; k++) {
     const r = streakRng.fork(`${k}`)
     const altitude = lerp(0.03, 0.45, r.next() ** 1.3)
-    const x = sunAt[0] + gaussian(r) * period * 0.4
+    const x = anchor + gaussian(r) * period * 0.4
     const y = yAt(altitude)
     far.push({ altitude, parts: streak(r, x, y, lerp(0.3, 1, r.next()), sunward(x), tonesAt(x, y, altitude)) })
   }

@@ -26,23 +26,24 @@ export default defineTheme({
     lake: param.chance(0.35),
   },
 
-  compose({ env, loop, rng, p, palette, comp }) {
+  compose({ env, loop, cycle, rng, p, palette, comp }) {
     const layers: Layer[] = [sky(env, { horizon: p.horizon })]
     if (palette.mood === 'night') layers.push(...stars(env, rng.fork('stars'), { horizon: p.horizon }))
     if (palette.mood === 'dawn') layers.push(...stars(env, rng.fork('stars'), { horizon: p.horizon, density: 0.3, brightness: 0.35 }))
-    const sunAt = comp.sunPosition(p.horizon)
-    layers.push(sun(env, { at: sunAt, radius: rng.fork('sun').range(0.035, 0.065) * comp.scale }))
-    if (p.rays) layers.push(lightShafts(env, rng.fork('rays'), { at: sunAt, length: env.aspect * 0.7 }))
+    const heavens = comp.celestial(p.horizon)
+    const sunAt = heavens.light
+    layers.push(sun(env, { sky: heavens, radius: rng.fork('sun').range(0.035, 0.065) * comp.scale }))
+    if (p.rays && !cycle) layers.push(lightShafts(env, rng.fork('rays'), { at: sunAt, length: env.aspect * 0.7 }))
 
     const cloudDirection = rng.fork('wind').chance(0.5) ? 1 : -1
-    layers.push(...cloudscape(env, rng.fork('clouds'), { horizon: p.horizon, amount: p.clouds, light: sunAt, direction: cloudDirection }))
+    layers.push(...cloudscape(env, rng.fork('clouds'), { horizon: p.horizon, amount: p.clouds, light: sunAt, direction: cloudDirection, anchor: comp.focal.x }))
 
     const depths = comp.depthSteps(p.ridges, { near: 0.1, far: 0.95 })
     const heroIndex = depths.length >= 5 ? 1 : 0
     const heroX = comp.counterX
-    const lakeIndex = p.lake && loop === 'ambient' && depths.length >= 4 ? Math.max(heroIndex, depths.length - 3) : -1
+    const lakeIndex = p.lake && loop !== 'pan' && depths.length >= 4 ? Math.max(heroIndex, depths.length - 3) : -1
     const lakeRng = rng.fork('lake')
-    const lakeX = sunAt[0] + lakeRng.range(-0.08, 0.08) * env.aspect
+    const lakeX = comp.focal.x + lakeRng.range(-0.08, 0.08) * env.aspect
     const lakeWidth = env.aspect * lakeRng.range(0.45, 0.75)
     let behind: Vec[] | undefined
     depths.forEach((depth, i) => {
@@ -64,7 +65,7 @@ export default defineTheme({
           i > heroIndex
             ? [
                 { x: heroX, width: env.aspect * 0.16, amount: lerp(0.65, 0.35, i / depths.length) },
-                { x: sunAt[0], width: env.aspect * 0.1, amount: 0.35 },
+                { x: comp.focal.x, width: env.aspect * 0.1, amount: 0.35 },
               ]
             : [],
         rim: smoothstep((depth - 0.1) / 0.45),
@@ -81,8 +82,8 @@ export default defineTheme({
       if (i === lakeIndex) {
         layers.push(...lake(env, lakeRng.fork('water'), { x: lakeX, width: lakeWidth, waterline: baseline + 0.004, depth: depth - 0.012, glitter: sunAt[0] }))
       }
-      if (i <= heroIndex + 1 && !near) {
-        layers.push(sunHaze(env, { at: [sunAt[0], p.horizon], depth: depth - 0.005, radius: env.aspect * 0.45, strength: i === 0 ? 0.45 : 0.25 }))
+      if (i === Math.min(heroIndex + 1, depths.length - 2)) {
+        layers.push(sunHaze(env, { at: [sunAt[0], p.horizon], depth: depth - 0.005, radius: env.aspect * 0.45, strength: 0.5 }))
       }
 
       if (i > 0 && !near) {
@@ -110,7 +111,7 @@ export default defineTheme({
           }),
         )
       }
-      if (near && p.framing && loop === 'ambient') {
+      if (near && p.framing && loop !== 'pan') {
         layers.push(
           treeline(env, rng.fork('framing'), { on: r, height: [0.28, 0.5], density: 0.85, side: comp.framingSide, reach: 0.28 }),
         )

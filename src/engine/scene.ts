@@ -32,6 +32,8 @@ export interface Layer {
   edge?: Vec[]
   light?: Vec
   lightRadius?: number
+  anchor?: Vec
+  orbit?: { horizon: number; dir: 1 | -1; radius: number; glow: number }
   parallax?: number
   wrap?: boolean
   motion?: Motion[]
@@ -54,7 +56,7 @@ export interface Scene {
   aspect: number
   palette: Palette
   params: Record<string, ParamValue>
-  loop: { mode: LoopMode; seconds: number }
+  loop: { mode: LoopMode; cycle: boolean; seconds: number }
   layers: Layer[]
   post: PostFx
   attempt: number

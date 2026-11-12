@@ -12,6 +12,11 @@ export default defineTheme({
   moods: { golden: 3, dusk: 3, night: 2, dawn: 1 },
   atmosphere: { gamma: 1, maxHaze: 0.85 },
   palette: {
+    midday: {
+      haze: oklch(0.84, 0.045, 78),
+      mid: oklch(0.68, 0.09, 62),
+      ink: oklch(0.42, 0.08, 48),
+    },
     overcast: {
       haze: oklch(0.8, 0.025, 75),
       mid: oklch(0.6, 0.04, 62),
@@ -36,19 +41,21 @@ export default defineTheme({
     tree: param.chance(0.55),
   },
 
-  compose({ env, loop, rng, p, palette, comp }) {
+  compose({ env, loop, cycle, rng, p, palette, comp }) {
     const layers: Layer[] = [sky(env, { horizon: p.horizon })]
     if (palette.mood === 'night') layers.push(...stars(env, rng.fork('stars'), { horizon: p.horizon, density: 1.3 }))
-    const sunAt = comp.sunPosition(p.horizon)
-    layers.push(sun(env, { at: sunAt, radius: rng.fork('sun').range(0.04, 0.075) * comp.scale }))
+    const heavens = comp.celestial(p.horizon)
+    const sunAt = heavens.light
+    layers.push(sun(env, { sky: heavens, radius: rng.fork('sun').range(0.04, 0.075) * comp.scale }))
     layers.push(sunHaze(env, { at: [sunAt[0], p.horizon], depth: 0.9, radius: env.aspect * 0.5, strength: 0.4 }))
-    if (p.rays) layers.push(lightShafts(env, rng.fork('rays'), { at: sunAt, length: env.aspect * 0.75, strength: 0.06 }))
+    if (p.rays && !cycle) layers.push(lightShafts(env, rng.fork('rays'), { at: sunAt, length: env.aspect * 0.75, strength: 0.06 }))
     layers.push(
       ...cloudscape(env, rng.fork('clouds'), {
         horizon: p.horizon,
         amount: p.clouds,
         light: sunAt,
         direction: comp.focal.side === 'left' ? -1 : 1,
+        anchor: comp.focal.x,
       }),
     )
 
@@ -88,7 +95,7 @@ export default defineTheme({
           i > heroIndex
             ? [
                 { x: heroX, width: env.aspect * 0.16, amount: lerp(0.6, 0.3, i / depths.length) },
-                { x: sunAt[0], width: env.aspect * 0.1, amount: 0.3 },
+                { x: comp.focal.x, width: env.aspect * 0.1, amount: 0.3 },
               ]
             : [],
       })
@@ -103,7 +110,7 @@ export default defineTheme({
       if (near) {
         layers.push(scrub(env, rng.fork('scrub'), { on: d, size: [0.03, 0.065], density: p.scrub, lean: wind * 0.35 }))
       }
-      if (near && p.tree && loop === 'ambient') {
+      if (near && p.tree && loop !== 'pan') {
         const t = rng.fork('dead-tree')
         const x = comp.framingSide === 'left' ? env.aspect * t.range(0.06, 0.2) : env.aspect * t.range(0.8, 0.94)
         layers.push({

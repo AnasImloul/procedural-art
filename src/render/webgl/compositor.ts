@@ -26,7 +26,7 @@ void main() {
   outColor = texture(uTex, vec2(vUv.x - uShift, 1.0 - vUv.y)) * uAlpha * mask;
 }`
 
-const POST = `#version 300 es
+export const POST = `#version 300 es
 precision highp float;
 precision highp int;
 uniform sampler2D uTex;
@@ -64,7 +64,7 @@ interface Group {
   mask?: WebGLTexture
 }
 
-function compile(gl: WebGL2RenderingContext, fragment: string): WebGLProgram {
+export function compile(gl: WebGL2RenderingContext, fragment: string): WebGLProgram {
   const program = gl.createProgram()!
   for (const [type, source] of [
     [gl.VERTEX_SHADER, VERTEX],

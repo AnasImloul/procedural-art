@@ -3,10 +3,11 @@ import { MOOD_IDS, type MoodId } from '../engine/moods'
 import type { AspectId, LoopMode, Scene } from '../engine/scene'
 import type { ParamOverrides, Theme } from '../engine/theme'
 import { renderSvg, type SvgMode } from '../render/svg'
-import { exportVideo } from '../render/video'
+import { exportCycleVideo, exportVideo } from '../render/video'
+import { cycleLoader, cycleSource } from './cycle'
 import { THEMES } from '../themes'
 import { exportPool, download } from './render'
-import { ASPECT_IDS, EXPORT_PRESETS, VIDEO_PRESETS, type ViewState } from './state'
+import { ASPECT_IDS, DEFAULT_HOUR, EXPORT_PRESETS, VIDEO_PRESETS, type ViewState } from './state'
 import { Thumb } from './Thumb'
 
 interface SidebarProps {
@@ -172,13 +173,12 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
     setVideo({ label, progress: 0 })
     setMessage(undefined)
     try {
-      const result = await exportVideo(scene, {
-        width,
-        height,
-        signal: controller.signal,
-        onProgress: (progress) => setVideo({ label, progress }),
-      })
-      download(result.blob, `${baseName}-${state.loop ?? 'ambient'}-${width}x${height}${result.extension}`)
+      const options = { width, height, signal: controller.signal, onProgress: (progress: number) => setVideo({ label, progress }) }
+      const source = scene.loop.cycle ? cycleSource(theme, state, scene) : undefined
+      const result = source
+        ? await exportCycleVideo(source, cycleLoader(state), { ...options, startHour: state.hour ?? DEFAULT_HOUR })
+        : await exportVideo(scene, options)
+      download(result.blob, `${baseName}-${state.loop ?? 'ambient'}${state.cycle ? '-day' : ''}-${width}x${height}${result.extension}`)
       setMessage(`Saved ${result.codec.toUpperCase()} ${result.extension.slice(1).toUpperCase()}, ${scene.loop.seconds} s loop`)
     } catch (err) {
       setMessage(err instanceof DOMException && err.name === 'AbortError' ? 'Video export cancelled' : err instanceof Error ? err.message : 'Video export failed')
@@ -262,7 +262,7 @@ export function Sidebar({ state, theme, scene, canGoBack, canGoForward, update, 
               key={t.id}
               label={t.name}
               active={t.id === state.theme}
-              job={{ theme: t.id, seed: state.seed, aspect: '16:9', mood: state.mood, loop: state.loop, overrides: {}, width: 320, height: 180 }}
+              job={{ theme: t.id, seed: state.seed, aspect: '16:9', mood: state.mood, loop: state.loop, cycle: state.cycle, hour: state.hour, overrides: {}, width: 320, height: 180 }}
               onSelect={() => update({ theme: t.id, version: undefined })}
             />
           ))}
@@ -298,11 +298,22 @@ export function Sidebar({ state, theme, scene, canGoBack, canGoForward, update, 
       </Section>
 
       <Section title="Motion">
-        <Chips<LoopMode>
-          items={['ambient', 'pan']}
-          value={state.loop ?? 'ambient'}
-          onChange={(loop) => update({ loop: loop === 'pan' ? 'pan' : undefined })}
-        />
+        <div className="motion-rows">
+          <span className="motion-label">Camera</span>
+          <Chips<LoopMode>
+            items={['ambient', 'pan']}
+            value={state.loop ?? 'ambient'}
+            label={(loop) => (loop === 'ambient' ? 'still' : loop)}
+            onChange={(loop) => update({ loop: loop === 'pan' ? 'pan' : undefined })}
+          />
+          <span className="motion-label">Time</span>
+          <Chips<'fixed' | 'cycle'>
+            items={['fixed', 'cycle']}
+            value={state.cycle ? 'cycle' : 'fixed'}
+            label={(time) => (time === 'cycle' ? 'day cycle' : time)}
+            onChange={(time) => update({ cycle: time === 'cycle' ? true : undefined, hour: time === 'cycle' ? (state.hour ?? DEFAULT_HOUR) : state.hour })}
+          />
+        </div>
       </Section>
 
       <Section

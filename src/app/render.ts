@@ -5,6 +5,7 @@ import { CancelledError, RenderPool } from '../render/pool'
 const cores = navigator.hardwareConcurrency || 4
 export const thumbPool = new RenderPool(Math.max(1, Math.min(3, cores - 1)))
 export const exportPool = new RenderPool(1)
+export const cyclePool = new RenderPool(2)
 
 export function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value)

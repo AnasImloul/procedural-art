@@ -1,4 +1,3 @@
-import type { Scene } from '../engine/scene'
 
 export const GRAIN_REFERENCE_HEIGHT = 1080
 export const GRAIN_FPS = 24
@@ -16,7 +15,7 @@ export function cellNoise(x: number, y: number, seed: number): number {
   return (h >>> 0) / 4294967296
 }
 
-export function grainSeeds(scene: Scene, t: number): [number, number] {
+export function grainSeeds(scene: { seed: string; loop: { seconds: number } }, t: number): [number, number] {
   const frames = Math.max(1, Math.round(scene.loop.seconds * GRAIN_FPS))
   const frame = Math.floor((t - Math.floor(t)) * frames)
   const seed = hashString(`${scene.seed}/grain/${frame}`)

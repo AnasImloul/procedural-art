@@ -1,6 +1,6 @@
 import { mix, type Color } from './color'
-import { clamp } from './math'
-import { ANCHOR_KEYS, MOODS, type AnchorKey, type Anchors, type MoodId } from './moods'
+import { clamp, lerp } from './math'
+import { ANCHOR_KEYS, MOOD_LIGHT, MOODS, type AnchorKey, type Anchors, type MoodId, type MoodLight } from './moods'
 import type { Rng } from './rng'
 
 const MID = 0.45
@@ -15,6 +15,7 @@ export type PaletteOverrides = Partial<Record<MoodId, Partial<Record<AnchorKey, 
 export interface Palette {
   mood: MoodId
   anchors: Anchors
+  light: MoodLight
   atDepth(depth: number): Color
 }
 
@@ -31,12 +32,29 @@ export function makePalette(rng: Rng, mood: MoodId, atmosphere: Atmosphere, over
       a: base.a,
     }
   }
+  return paletteFrom(mood, anchors, MOOD_LIGHT[mood], atmosphere)
+}
+
+function paletteFrom(mood: MoodId, anchors: Anchors, light: MoodLight, atmosphere: Atmosphere): Palette {
   return {
     mood,
     anchors,
+    light,
     atDepth: (depth) => {
       const a = atmosphere.maxHaze * clamp(depth) ** atmosphere.gamma
       return a < MID ? mix(anchors.ink, anchors.mid, a / MID) : mix(anchors.mid, anchors.haze, (a - MID) / (1 - MID))
     },
   }
+}
+
+export function blendPalettes(a: Palette, b: Palette, w: number, atmosphere: Atmosphere): Palette {
+  const anchors = {} as Anchors
+  for (const key of ANCHOR_KEYS) anchors[key] = mix(a.anchors[key], b.anchors[key], w)
+  const light = {} as MoodLight
+  for (const key of Object.keys(a.light) as (keyof MoodLight)[]) {
+    const x = a.light[key]
+    const y = b.light[key]
+    ;(light as unknown as Record<string, number | boolean>)[key] = typeof x === 'number' && typeof y === 'number' ? lerp(x, y, w) : w < 0.5 ? x : y
+  }
+  return paletteFrom(w < 0.5 ? a.mood : b.mood, anchors, light, atmosphere)
 }

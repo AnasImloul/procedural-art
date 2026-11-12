@@ -1,5 +1,4 @@
 import { mix, withAlpha } from '../color'
-import { MOOD_LIGHT } from '../moods'
 import { rect } from '../path'
 import type { Layer, Vec } from '../scene'
 import type { Env } from '../theme'
@@ -15,7 +14,7 @@ export interface SunHazeOptions {
 export function sunHaze(env: Env, { at: [x, y], depth, radius, strength = 0.5, squash = 0.35 }: SunHazeOptions): Layer {
   const { light, skyHorizon } = env.palette.anchors
   const color = mix(light, skyHorizon, 0.4)
-  const a = strength * MOOD_LIGHT[env.palette.mood].haze
+  const a = strength * env.palette.light.haze
   return {
     id: `sun-haze@${depth.toFixed(3)}`,
     role: 'fog',

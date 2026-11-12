@@ -9,9 +9,13 @@ export interface ViewState {
   aspect: AspectId
   mood?: MoodId
   loop?: LoopMode
+  cycle?: boolean
+  hour?: number
   version?: number
   overrides: ParamOverrides
 }
+
+export const DEFAULT_HOUR = 7
 
 export const ASPECT_IDS = Object.keys(ASPECTS) as AspectId[]
 
@@ -74,6 +78,8 @@ export function readHash(hash: string): ViewState {
     aspect: aspect && aspect in ASPECTS ? aspect : '16:9',
     mood: mood && MOOD_IDS.includes(mood) ? mood : undefined,
     loop: q.get('loop') === 'pan' ? 'pan' : undefined,
+    cycle: q.get('cycle') === '1' || q.get('loop') === 'cycle' ? true : undefined,
+    hour: q.has('h') ? (((Number(q.get('h')) % 24) + 24) % 24 || 0) : undefined,
     version: q.has('v') ? Number(q.get('v')) : undefined,
     overrides,
   }
@@ -83,7 +89,9 @@ export function toHash(state: ViewState): string {
   const theme = findTheme(state.theme)!
   const q = new URLSearchParams({ theme: theme.id, v: String(theme.version), seed: state.seed, aspect: state.aspect })
   if (state.mood) q.set('mood', state.mood)
-  if (state.loop === 'pan') q.set('loop', 'pan')
+  if (state.loop) q.set('loop', state.loop)
+  if (state.cycle) q.set('cycle', '1')
+  if (state.cycle && state.hour !== undefined) q.set('h', String(+state.hour.toFixed(2)))
   for (const [key, value] of Object.entries(state.overrides)) {
     if (value !== undefined) q.set(`p.${key}`, String(typeof value === 'number' ? +value.toFixed(4) : value))
   }

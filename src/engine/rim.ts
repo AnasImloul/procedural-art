@@ -1,6 +1,5 @@
 import { mix } from './color'
 import { lerp, smoothstep } from './math'
-import { MOOD_LIGHT } from './moods'
 import type { Palette } from './palette'
 import { solid, type Layer, type Shape, type Vec } from './scene'
 
@@ -19,7 +18,7 @@ export function rimLight(layer: Layer, palette: Palette, light: Vec): Layer {
     : source
   const width = lerp(0.0034, 0.0012, layer.depth)
   const color = mix(palette.anchors.light, palette.atDepth(layer.depth), 0.1 + 0.45 * layer.depth)
-  const strength = MOOD_LIGHT[palette.mood].rim * (typeof layer.rim === 'number' ? layer.rim : 1)
+  const strength = palette.light.rim * (typeof layer.rim === 'number' ? layer.rim : 1)
   const smooth = 3
   const period = span
   const runs: string[][] = Array.from({ length: LEVELS - 1 }, () => [])

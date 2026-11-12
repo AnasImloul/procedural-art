@@ -34,7 +34,7 @@ export function assessComposition(scene: Scene, rules: QualityRules = {}): Quali
 
   const sun = scene.layers.find((l) => l.light && l.lightRadius)
   if (sun?.light && sun.lightRadius) {
-    const [sx, sy] = sun.light
+    const [sx, sy] = sun.anchor ?? sun.light
     const r = sun.lightRadius
     const sky = Math.min(...terrain.map((l) => sampleEdge(l.edge, sx)))
     const visible = clamp((sky - (sy - r)) / (2 * r))

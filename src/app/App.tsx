@@ -3,9 +3,10 @@ import { MOOD_IDS } from '../engine/moods'
 import { ASPECTS, checkScene } from '../engine/scene'
 import { generate } from '../engine/theme'
 import { THEMES, findTheme } from '../themes'
+import { cycleLoader, cycleSource } from './cycle'
 import { Sidebar } from './Sidebar'
-import { Stage } from './Stage'
-import { ASPECT_IDS, randomSeed, readHash, toHash, type ViewState } from './state'
+import { clock, Stage, type CycleProps } from './Stage'
+import { ASPECT_IDS, DEFAULT_HOUR, randomSeed, readHash, toHash, type ViewState } from './state'
 import { Thumb } from './Thumb'
 
 const STRIP_SIZE = 8
@@ -20,8 +21,16 @@ export function App() {
   const theme = findTheme(state.theme)!
   const scene = useMemo(
     () =>
-      generate(theme, { seed: state.seed, aspect: ASPECTS[state.aspect], mood: state.mood, loop: state.loop, overrides: state.overrides }),
-    [theme, state.seed, state.aspect, state.mood, state.loop, state.overrides],
+      generate(theme, {
+        seed: state.seed,
+        aspect: ASPECTS[state.aspect],
+        mood: state.mood,
+        loop: state.loop,
+        cycle: state.cycle,
+        hour: state.hour ?? DEFAULT_HOUR,
+        overrides: state.overrides,
+      }),
+    [theme, state.seed, state.aspect, state.mood, state.loop, state.cycle, state.hour, state.overrides],
   )
 
   useEffect(() => {
@@ -78,19 +87,24 @@ export function App() {
   })
 
   const stale = state.version !== undefined && state.version !== theme.version
+  const source = useMemo(() => (state.cycle ? cycleSource(theme, state, scene) : undefined), [theme, state, scene])
+  const loader = useMemo(() => cycleLoader(state), [state.theme, state.seed, state.aspect, state.loop, state.overrides])
+  const onHour = useCallback((hour: number) => update({ hour: Math.round(hour * 100) / 100 }), [update])
+  const cycleProps: CycleProps | undefined = source && { source, loader, hour: state.hour ?? DEFAULT_HOUR, onHour }
   const stripHeight = 176
   const stripWidth = Math.round(stripHeight * ASPECTS[state.aspect])
 
   return (
     <div className="app">
       <main className="stage">
-        <Stage scene={scene} onRendered={setRenderMs} />
+        <Stage scene={scene} cycle={cycleProps} onRendered={setRenderMs} />
         <footer className="hud">
           <span>
             {theme.name} v{theme.version}
           </span>
           <span>{state.seed}</span>
           <span>{scene.palette.mood}</span>
+          {state.cycle && <span>{clock(state.hour ?? DEFAULT_HOUR)}</span>}
           <span>{state.aspect}</span>
           <span>{renderMs.toFixed(0)} ms</span>
           {stale && <span className="hud-warn">link made with v{state.version}</span>}

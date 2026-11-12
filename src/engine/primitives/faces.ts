@@ -1,7 +1,6 @@
 import { mix, withAlpha, type Color } from '../color'
 import { sampleEdge } from '../geometry'
 import { clamp, lerp } from '../math'
-import { MOOD_LIGHT } from '../moods'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
 import type { Shape, Vec } from '../scene'
@@ -118,7 +117,7 @@ export function mountainFaces(env: Env, rng: Rng, edge: Vec[], { depth, baseline
   const folds: Fold[] = Array.from({ length: m + 1 }, (_, k) => foldOf(k))
 
   const { ink, skyTop, light: lightColor } = env.palette.anchors
-  const mood = MOOD_LIGHT[env.palette.mood]
+  const mood = env.palette.light
   const shadowColor = mix(ink, skyTop, 0.35)
   const far = lerp(1, 0.7, clamp((depth - 0.35) / 0.65))
   const shapes: Shape[] = []

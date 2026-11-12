@@ -1,6 +1,5 @@
 import { mix, withAlpha } from '../color'
 import { lerp } from '../math'
-import { MOOD_LIGHT } from '../moods'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
 import type { Layer, Shape, Vec } from '../scene'
@@ -15,7 +14,7 @@ export interface LightShaftsOptions {
 }
 
 export function lightShafts(env: Env, rng: Rng, { at, length, count = 7, strength = 0.07, depth = 0.9995 }: LightShaftsOptions): Layer {
-  const a = strength * MOOD_LIGHT[env.palette.mood].rays
+  const a = strength * env.palette.light.rays
   const color = mix(env.palette.anchors.light, env.palette.anchors.sun, 0.5)
   const shapes: Shape[] = []
   if (a > 0) {

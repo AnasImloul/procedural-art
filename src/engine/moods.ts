@@ -4,10 +4,20 @@ export const ANCHOR_KEYS = ['skyTop', 'skyHorizon', 'sun', 'haze', 'mid', 'ink',
 export type AnchorKey = (typeof ANCHOR_KEYS)[number]
 export type Anchors = Record<AnchorKey, Color>
 
-export const MOOD_IDS = ['dawn', 'golden', 'dusk', 'night', 'overcast'] as const
+export const MOOD_IDS = ['dawn', 'golden', 'midday', 'dusk', 'night', 'overcast'] as const
 export type MoodId = (typeof MOOD_IDS)[number]
 
 export const MOODS: Record<MoodId, Anchors> = {
+  midday: {
+    skyTop: oklch(0.6, 0.1, 245),
+    skyHorizon: oklch(0.86, 0.045, 220),
+    sun: oklch(0.98, 0.03, 95),
+    haze: oklch(0.8, 0.04, 228),
+    mid: oklch(0.52, 0.06, 190),
+    ink: oklch(0.27, 0.04, 200),
+    light: oklch(0.97, 0.03, 90),
+    accent: oklch(0.66, 0.12, 35),
+  },
   dawn: {
     skyTop: oklch(0.56, 0.07, 262),
     skyHorizon: oklch(0.86, 0.08, 25),
@@ -75,7 +85,31 @@ export interface MoodLight {
 export const MOOD_LIGHT: Record<MoodId, MoodLight> = {
   dawn: { rim: 0.8, sunOpacity: 1, glow: 0.9, glowReach: 1, lit: 1, haze: 0.8, rays: 0.8, band: 1.35, underlit: true },
   golden: { rim: 1, sunOpacity: 1, glow: 1, glowReach: 1, lit: 1.5, haze: 1, rays: 1, band: 1.3, underlit: true },
+  midday: { rim: 0.35, sunOpacity: 1, glow: 0.6, glowReach: 1, lit: 0.9, haze: 0.4, rays: 0, band: 1, underlit: false },
   dusk: { rim: 1, sunOpacity: 1, glow: 1, glowReach: 1, lit: 1.25, haze: 1, rays: 1, band: 1.6, underlit: true },
   night: { rim: 0.55, sunOpacity: 1, glow: 0.7, glowReach: 1, lit: 0.6, haze: 0.45, rays: 0, band: 1, underlit: false },
   overcast: { rim: 0.25, sunOpacity: 0.3, glow: 0.55, glowReach: 2.4, lit: 0.4, haze: 0.35, rays: 0, band: 1, underlit: false },
+}
+
+export const DAY_CYCLE: [number, MoodId][] = [
+  [0, 'night'],
+  [4.5, 'night'],
+  [5.75, 'dawn'],
+  [7.25, 'golden'],
+  [10, 'midday'],
+  [14.5, 'midday'],
+  [17, 'golden'],
+  [18.6, 'dusk'],
+  [20, 'night'],
+  [24, 'night'],
+]
+
+export function cycleMoods(hour: number): { from: MoodId; to: MoodId; weight: number } {
+  const h = ((hour % 24) + 24) % 24
+  let k = 0
+  while (k < DAY_CYCLE.length - 2 && DAY_CYCLE[k + 1][0] <= h) k++
+  const [h0, from] = DAY_CYCLE[k]
+  const [h1, to] = DAY_CYCLE[k + 1]
+  const t = (h - h0) / (h1 - h0)
+  return { from, to, weight: t * t * (3 - 2 * t) }
 }

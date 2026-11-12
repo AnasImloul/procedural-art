@@ -1,10 +1,10 @@
-import { renderToBlob, type RenderJob } from './jobs'
+import { renderKeyframe, renderToBlob, type KeyframeJob, type RenderJob } from './jobs'
 
-type WorkerMessage = { ready: boolean } | { blob: Blob } | { error: string }
+type WorkerMessage = { ready: boolean } | { result: Blob | ImageBitmap[] } | { error: string }
 
 interface Task {
-  job: RenderJob
-  resolve: (blob: Blob) => void
+  job: RenderJob | KeyframeJob
+  resolve: (result: never) => void
   reject: (err: Error) => void
 }
 
@@ -14,8 +14,8 @@ export class CancelledError extends Error {
   }
 }
 
-export interface RenderHandle {
-  promise: Promise<Blob>
+export interface RenderHandle<T = Blob> {
+  promise: Promise<T>
   cancel(): void
 }
 
@@ -38,9 +38,17 @@ export class RenderPool {
   }
 
   render(job: RenderJob): RenderHandle {
+    return this.enqueue<Blob>(job)
+  }
+
+  keyframe(job: KeyframeJob): RenderHandle<ImageBitmap[]> {
+    return this.enqueue<ImageBitmap[]>(job)
+  }
+
+  private enqueue<T>(job: RenderJob | KeyframeJob): RenderHandle<T> {
     let task!: Task
-    const promise = new Promise<Blob>((resolve, reject) => {
-      task = { job, resolve, reject }
+    const promise = new Promise<T>((resolve, reject) => {
+      task = { job, resolve: resolve as (result: never) => void, reject }
     })
     this.queue.push(task)
     this.pump()
@@ -62,7 +70,7 @@ export class RenderPool {
       const task = this.busy.get(worker)
       this.busy.delete(worker)
       this.idle.push(worker)
-      if ('blob' in message) task?.resolve(message.blob)
+      if ('result' in message) task?.resolve(message.result as never)
       else task?.reject(new Error(message.error))
     }
     this.pump()
@@ -88,7 +96,8 @@ export class RenderPool {
       const task = this.queue.shift()!
       await new Promise((r) => setTimeout(r, 0))
       try {
-        task.resolve(await renderToBlob(task.job))
+        const { job } = task
+        task.resolve(('keyframe' in job ? await renderKeyframe(job) : await renderToBlob(job)) as never)
       } catch (err) {
         task.reject(err instanceof Error ? err : new Error(String(err)))
       }

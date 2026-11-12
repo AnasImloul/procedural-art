@@ -1,6 +1,6 @@
 import { makeComposition, type Composition } from './compose'
-import type { MoodId } from './moods'
-import { makePalette, type Atmosphere, type Palette, type PaletteOverrides } from './palette'
+import { cycleMoods, type MoodId } from './moods'
+import { blendPalettes, makePalette, type Atmosphere, type Palette, type PaletteOverrides } from './palette'
 import { assessComposition, type QualityRules } from './quality'
 import { Rng } from './rng'
 import { finalize, type Layer, type LoopMode, type ParamValue, type PostFx, type Scene } from './scene'
@@ -30,6 +30,7 @@ export const param = {
 export interface ComposeContext<P> {
   env: Env
   loop: LoopMode
+  cycle: boolean
   rng: Rng
   p: P
   palette: Palette
@@ -45,7 +46,7 @@ export interface Theme<S extends ParamSchema = ParamSchema> {
   palette?: PaletteOverrides
   outline: 'rim' | 'contour' | 'none'
   post?: Partial<PostFx>
-  loop?: { seconds: number; pan?: { seconds: number; speed: number } }
+  loop?: { seconds: number; pan?: { seconds: number; speed: number }; cycle?: number }
   quality?: QualityRules
   params: S
   compose(ctx: ComposeContext<ParamValues<S>>): Layer[]
@@ -72,11 +73,24 @@ export interface GenerateOptions {
   aspect: number
   mood?: MoodId
   loop?: LoopMode
+  cycle?: boolean
+  hour?: number
   overrides?: ParamOverrides
 }
 
 const DEFAULT_POST: PostFx = { grain: 0.035, vignette: 0.28, bloom: 0 }
 const DEFAULT_PAN = { seconds: 120, speed: 6 }
+const DEFAULT_CYCLE_SECONDS = 120
+
+export function cyclePalette(theme: Theme, seed: string, hour: number): Palette {
+  const rng = new Rng(`${theme.id}/v${theme.version}/${seed}`).fork('palette')
+  const { from, to, weight } = cycleMoods(hour)
+  return blendPalettes(makePalette(rng, from, theme.atmosphere, theme.palette), makePalette(rng, to, theme.atmosphere, theme.palette), weight, theme.atmosphere)
+}
+
+function stillForCycle(layers: Layer[]): Layer[] {
+  return layers.map((layer) => (layer.motion ? { ...layer, motion: layer.clip ? undefined : layer.motion.filter((m) => m.type === 'drift') } : layer))
+}
 
 function withPan(layers: Layer[], speed: number): Layer[] {
   return layers.map((layer) =>
@@ -88,11 +102,16 @@ function withPan(layers: Layer[], speed: number): Layer[] {
 
 const MAX_ATTEMPTS = 6
 
-export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect, mood, loop = 'ambient', overrides }: GenerateOptions): Scene {
+export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect, mood, loop = 'ambient', cycle = false, hour = 12, overrides }: GenerateOptions): Scene {
   const root = new Rng(`${theme.id}/v${theme.version}/${seed}`)
-  const palette = makePalette(root.fork('palette'), mood ?? root.fork('mood').weighted(theme.moods), theme.atmosphere, theme.palette)
+  const palette =
+    cycle
+      ? cyclePalette(theme as unknown as Theme, seed, hour)
+      : makePalette(root.fork('palette'), mood ?? root.fork('mood').weighted(theme.moods), theme.atmosphere, theme.palette)
   const params = resolveParams(theme.params, root.fork('params'), overrides)
   const pan = { ...DEFAULT_PAN, ...theme.loop?.pan }
+  const cycleSeconds = theme.loop?.cycle ?? DEFAULT_CYCLE_SECONDS
+  const panSpeed = cycle ? (pan.speed * cycleSeconds) / pan.seconds : pan.speed
 
   let best: Scene | undefined
   let bestScore = Infinity
@@ -101,19 +120,20 @@ export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect,
     const composed = theme.compose({
       env: { palette, aspect },
       loop,
+      cycle,
       rng: layout.fork('layers'),
       p: params,
       palette,
-      comp: makeComposition(layout.fork('composition'), aspect),
+      comp: makeComposition(layout.fork('composition'), aspect, cycle ? hour : undefined),
     })
-    const layers = loop === 'pan' ? withPan(composed, pan.speed) : composed
+    const panned = loop === 'pan' ? withPan(composed, panSpeed) : composed
     const scene: Scene = {
       seed: root.key,
       aspect,
       palette,
       params,
-      loop: { mode: loop, seconds: loop === 'pan' ? pan.seconds : (theme.loop?.seconds ?? 12) },
-      layers: finalize(layers, palette, theme.outline),
+      loop: { mode: loop, cycle, seconds: cycle ? cycleSeconds : loop === 'pan' ? pan.seconds : (theme.loop?.seconds ?? 12) },
+      layers: cycle ? stillForCycle(finalize(panned, palette, theme.outline)) : finalize(panned, palette, theme.outline),
       post: { ...DEFAULT_POST, ...theme.post },
       attempt,
     }

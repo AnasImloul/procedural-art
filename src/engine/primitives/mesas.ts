@@ -1,6 +1,5 @@
 import { mix, withAlpha } from '../color'
 import { lerp } from '../math'
-import { MOOD_LIGHT } from '../moods'
 import { loopNoise1D } from '../noise'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
@@ -89,7 +88,7 @@ export function mesas(env: Env, rng: Rng, { depth, baseline, height, count: [cMi
 
   const base = env.palette.atDepth(depth)
   const { ink, skyTop, light: lightColor } = env.palette.anchors
-  const mood = MOOD_LIGHT[env.palette.mood]
+  const mood = env.palette.light
   const shadow = solid(withAlpha(mix(ink, skyTop, 0.35), 0.3))
   const lit = solid(withAlpha(lightColor, 0.14 * mood.lit))
   const band = solid(withAlpha(mix(base, ink, 0.5), 0.16))
