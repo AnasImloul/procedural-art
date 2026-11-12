@@ -15,12 +15,15 @@ void main() {
 const LAYER = `#version 300 es
 precision highp float;
 uniform sampler2D uTex;
+uniform sampler2D uMask;
 uniform float uShift;
 uniform float uAlpha;
+uniform float uMasked;
 in vec2 vUv;
 out vec4 outColor;
 void main() {
-  outColor = texture(uTex, vec2(vUv.x - uShift, 1.0 - vUv.y)) * uAlpha;
+  float mask = uMasked > 0.5 ? texture(uMask, vec2(vUv.x, 1.0 - vUv.y)).a : 1.0;
+  outColor = texture(uTex, vec2(vUv.x - uShift, 1.0 - vUv.y)) * uAlpha * mask;
 }`
 
 const POST = `#version 300 es
@@ -58,6 +61,7 @@ void main() {
 interface Group {
   texture: WebGLTexture
   layer?: Layer
+  mask?: WebGLTexture
 }
 
 function compile(gl: WebGL2RenderingContext, fragment: string): WebGLProgram {
@@ -97,6 +101,7 @@ export class Compositor {
   private fbo: WebGLFramebuffer | null = null
   private fboTexture: WebGLTexture | null = null
   private groups: Group[] = []
+  private masks = new Map<string, WebGLTexture>()
   private scene?: Scene
   private width = 0
   private height = 0
@@ -130,7 +135,11 @@ export class Compositor {
         continue
       }
       flush()
-      this.groups.push({ texture: this.rasterize([layer], layer.role === 'fog' ? 0.5 : 1, !!layer.wrap), layer })
+      this.groups.push({
+        texture: this.rasterize([layer], layer.role === 'fog' ? 0.5 : 1, !!layer.wrap, !!layer.clip),
+        layer,
+        mask: layer.clip ? this.mask(layer.clip) : undefined,
+      })
     }
     flush()
     gl.bindTexture(gl.TEXTURE_2D, null)
@@ -150,12 +159,18 @@ export class Compositor {
     gl.useProgram(this.layerProgram)
     const shiftLoc = gl.getUniformLocation(this.layerProgram, 'uShift')
     const alphaLoc = gl.getUniformLocation(this.layerProgram, 'uAlpha')
-    gl.activeTexture(gl.TEXTURE0)
+    const maskedLoc = gl.getUniformLocation(this.layerProgram, 'uMasked')
+    gl.uniform1i(gl.getUniformLocation(this.layerProgram, 'uTex'), 0)
+    gl.uniform1i(gl.getUniformLocation(this.layerProgram, 'uMask'), 1)
     for (const group of this.groups) {
       const { shift, alpha } = group.layer ? motionAt(group.layer, t) : REST
       if (alpha <= 0) continue
       gl.uniform1f(shiftLoc, shift)
       gl.uniform1f(alphaLoc, alpha)
+      gl.uniform1f(maskedLoc, group.mask ? 1 : 0)
+      gl.activeTexture(gl.TEXTURE1)
+      gl.bindTexture(gl.TEXTURE_2D, group.mask ?? null)
+      gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, group.texture)
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     }
@@ -211,7 +226,25 @@ export class Compositor {
     return texture
   }
 
-  private rasterize(layers: Layer[], scale: number, wrap: boolean): WebGLTexture {
+  private mask(clip: string): WebGLTexture {
+    const cached = this.masks.get(clip)
+    if (cached) return cached
+    const { gl, scratch } = this
+    scratch.width = this.width
+    scratch.height = this.height
+    const ctx = scratch.getContext('2d')!
+    ctx.clearRect(0, 0, this.width, this.height)
+    ctx.setTransform(this.height, 0, 0, this.height, 0, 0)
+    ctx.fillStyle = '#fff'
+    ctx.fill(new Path2D(clip))
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    const texture = this.createTexture(gl.CLAMP_TO_EDGE, gl.LINEAR)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, scratch)
+    this.masks.set(clip, texture)
+    return texture
+  }
+
+  private rasterize(layers: Layer[], scale: number, wrap: boolean, ignoreClip = false): WebGLTexture {
     const { gl, scratch } = this
     const width = Math.max(1, Math.round(this.width * scale))
     const height = Math.max(1, Math.round(this.height * scale))
@@ -219,7 +252,7 @@ export class Compositor {
     scratch.height = height
     const ctx = scratch.getContext('2d')!
     ctx.clearRect(0, 0, width, height)
-    drawLayers(ctx, layers, { height, aspect: this.scene!.aspect })
+    drawLayers(ctx, layers, { height, aspect: this.scene!.aspect, ignoreClip })
     const texture = this.createTexture(wrap ? gl.REPEAT : gl.CLAMP_TO_EDGE, gl.LINEAR)
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, scratch)
@@ -229,6 +262,8 @@ export class Compositor {
 
   private releaseGroups() {
     for (const group of this.groups) this.gl.deleteTexture(group.texture)
+    for (const mask of this.masks.values()) this.gl.deleteTexture(mask)
     this.groups = []
+    this.masks.clear()
   }
 }

@@ -93,11 +93,21 @@ export function renderSvg(scene: Scene, { mode, height = 1080 }: { mode: SvgMode
   const defs = new Defs()
   const w = scene.aspect
   const body: string[] = []
+  const clips = new Map<string, string>()
 
   for (const layer of scene.layers) {
     const shapes = layer.shapes.map((s) => shapeMarkup(defs, s, mode)).join('')
     const { alpha } = motionAt(layer, 0)
-    if (shapes) body.push(`<g id="${escapeId(layer.id)}"${alpha < 1 ? ` opacity="${f(alpha)}"` : ''}>${shapes}</g>`)
+    let clip = ''
+    if (layer.clip) {
+      const id = `clip-${clips.size}`
+      if (!clips.has(layer.clip)) {
+        clips.set(layer.clip, id)
+        defs.add(`<clipPath id="${id}"><path d="${layer.clip}"/></clipPath>`)
+      }
+      clip = ` clip-path="url(#${clips.get(layer.clip)})"`
+    }
+    if (shapes) body.push(`<g id="${escapeId(layer.id)}"${alpha < 1 ? ` opacity="${f(alpha)}"` : ''}${clip}>${shapes}</g>`)
   }
 
   if (scene.post.vignette > 0) {

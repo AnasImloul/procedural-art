@@ -1,5 +1,6 @@
 import type { Color } from './color'
 import type { Palette } from './palette'
+import { mirrorPathY } from './path'
 import { rimLight } from './rim'
 
 export type Vec = [number, number]
@@ -24,7 +25,7 @@ export type Motion =
 
 export interface Layer {
   id: string
-  role: 'sky' | 'celestial' | 'terrain' | 'prop' | 'fog' | 'particles' | 'light'
+  role: 'sky' | 'celestial' | 'terrain' | 'prop' | 'fog' | 'particles' | 'light' | 'reflection' | 'water'
   depth: number
   shapes: Shape[]
   rim?: boolean | number
@@ -34,6 +35,8 @@ export interface Layer {
   parallax?: number
   wrap?: boolean
   motion?: Motion[]
+  clip?: string
+  lake?: { waterline: number }
 }
 
 export type ParamValue = number | boolean
@@ -62,9 +65,32 @@ export type AspectId = keyof typeof ASPECTS
 
 export const solid = (color: Color): Paint => ({ type: 'solid', color })
 
+function mirrorPaint(paint: Paint, axis: number): Paint {
+  if (paint.type === 'solid') return paint
+  if (paint.type === 'linear') return { ...paint, from: [paint.from[0], 2 * axis - paint.from[1]], to: [paint.to[0], 2 * axis - paint.to[1]] }
+  return { ...paint, center: [paint.center[0], 2 * axis - paint.center[1]] }
+}
+
+function reflect(layer: Layer, axis: number, clip: string): Layer {
+  return {
+    id: `${layer.id}:reflection`,
+    role: 'reflection',
+    depth: layer.depth,
+    wrap: layer.wrap,
+    motion: layer.motion,
+    clip,
+    shapes: layer.shapes.map((s) => ({
+      ...s,
+      d: mirrorPathY(s.d, axis),
+      fill: s.fill && mirrorPaint(s.fill, axis),
+      stroke: s.stroke && { ...s.stroke, paint: mirrorPaint(s.stroke.paint, axis) },
+    })),
+  }
+}
+
 export function finalize(layers: Layer[], palette: Palette, outline: 'rim' | 'contour' | 'none'): Layer[] {
   const light = layers.find((l) => l.light)?.light
-  return [...layers]
+  const finished = [...layers]
     .sort((a, b) => b.depth - a.depth)
     .flatMap((layer) => {
       if (layer.role !== 'terrain' && layer.role !== 'prop') return [layer]
@@ -72,6 +98,11 @@ export function finalize(layers: Layer[], palette: Palette, outline: 'rim' | 'co
       const filled = { ...layer, shapes: layer.shapes.map((s) => (s.fill ? s : { ...s, fill })) }
       return outline === 'rim' && light && layer.rim && layer.edge ? [filled, rimLight(filled, palette, light)] : [filled]
     })
+  return finished.flatMap((layer, i) =>
+    layer.lake && layer.clip
+      ? [...finished.slice(0, i).filter((l) => !l.lake && l.role !== 'water').map((l) => reflect(l, layer.lake!.waterline, layer.clip!)), layer]
+      : [layer],
+  )
 }
 
 export function checkScene(scene: Scene): string[] {

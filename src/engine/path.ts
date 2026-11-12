@@ -10,3 +10,14 @@ export const circle = (cx: number, cy: number, r: number) =>
 
 export const polygon = (points: Vec[]) =>
   points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${f(x)} ${f(y)}`).join('') + 'Z'
+
+export function mirrorPathY(d: string, axis: number): string {
+  return d.replace(/([MLHVAZ])([^MLHVAZ]*)/g, (_, cmd: string, args: string) => {
+    const n = args.trim() ? args.trim().split(/[\s,]+/).map(Number) : []
+    if (cmd === 'M' || cmd === 'L') return `${cmd}${f(n[0])} ${f(2 * axis - n[1])}`
+    if (cmd === 'V') return `V${f(2 * axis - n[0])}`
+    if (cmd === 'H') return `H${f(n[0])}`
+    if (cmd === 'A') return `A${f(n[0])} ${f(n[1])} ${n[2]} ${n[3]} ${1 - n[4]} ${f(n[5])} ${f(2 * axis - n[6])}`
+    return cmd
+  })
+}

@@ -1,5 +1,5 @@
 import { lerp, smoothstep } from '@/engine/math'
-import { clouds, fogBand, forest, lightShafts, ridge, sky, stars, sun, sunHaze, treeline } from '@/engine/primitives'
+import { cloudscape, fogBand, forest, lake, lightShafts, ridge, sky, stars, sun, sunHaze, treeline } from '@/engine/primitives'
 import type { Layer, Vec } from '@/engine/scene'
 import { defineTheme, param } from '@/engine/theme'
 
@@ -17,10 +17,13 @@ export default defineTheme({
     ridges: param.int(4, 6),
     peakiness: param.range(0.4, 0.9),
     fog: param.range(0.35, 0.8),
-    forest: param.range(0.3, 0.9),
+    forest: param.range(0.4, 1),
+    treeline: param.range(0.35, 0.8),
+    snow: param.range(0, 1),
     framing: param.chance(0.7),
     clouds: param.range(0, 1),
     rays: param.chance(0.6),
+    lake: param.chance(0.35),
   },
 
   compose({ env, loop, rng, p, palette, comp }) {
@@ -31,47 +34,26 @@ export default defineTheme({
     layers.push(sun(env, { at: sunAt, radius: rng.fork('sun').range(0.035, 0.065) * comp.scale }))
     if (p.rays) layers.push(lightShafts(env, rng.fork('rays'), { at: sunAt, length: env.aspect * 0.7 }))
 
-    const cloudOpacity = palette.mood === 'night' ? 0.45 : 0.9
     const cloudDirection = rng.fork('wind').chance(0.5) ? 1 : -1
-    const cloudRng = rng.fork('cloud-clusters')
-    const cloudClusters = Array.from({ length: cloudRng.int(1, 2) }, () => sunAt[0] + env.aspect * cloudRng.range(0.3, 0.7))
-    layers.push(
-      clouds(env, rng.fork('clouds-far'), {
-        horizon: p.horizon,
-        count: Math.round(p.clouds * 5),
-        band: [0.45, 0.85],
-        size: [0.12, 0.3],
-        depth: 0.999,
-        opacity: cloudOpacity * 0.8,
-        clusters: cloudClusters,
-        spread: 0.3,
-        light: sunAt,
-        motion: [{ type: 'sway', amount: 0.04 * cloudDirection, cycles: 1 }],
-      }),
-      clouds(env, rng.fork('clouds-near'), {
-        horizon: p.horizon,
-        count: Math.round(p.clouds * 3),
-        band: [0.15, 0.55],
-        size: [0.3, 0.6],
-        depth: 0.998,
-        opacity: cloudOpacity,
-        clusters: cloudClusters,
-        spread: 0.22,
-        light: sunAt,
-        motion: [{ type: 'drift', wraps: cloudDirection }],
-      }),
-    )
+    layers.push(...cloudscape(env, rng.fork('clouds'), { horizon: p.horizon, amount: p.clouds, light: sunAt, direction: cloudDirection }))
 
     const depths = comp.depthSteps(p.ridges, { near: 0.1, far: 0.95 })
     const heroIndex = depths.length >= 5 ? 1 : 0
     const heroX = comp.counterX
+    const lakeIndex = p.lake && loop === 'ambient' && depths.length >= 4 ? Math.max(heroIndex, depths.length - 3) : -1
+    const lakeRng = rng.fork('lake')
+    const lakeX = sunAt[0] + lakeRng.range(-0.08, 0.08) * env.aspect
+    const lakeWidth = env.aspect * lakeRng.range(0.45, 0.75)
     let behind: Vec[] | undefined
     depths.forEach((depth, i) => {
       const near = i === depths.length - 1
       const hero = i === heroIndex
       const baseline = lerp(p.horizon, 1.02, (1 - depth) ** 1.6)
       const scale = hero ? 1.55 : rng.fork(`scale-${i}`).pick([0.45, 0.7, 0.9, 1.1])
-      const amplitude = lerp(0.08, 0.28, p.peakiness) * lerp(0.45, 1, depth) * scale
+      const unit = lerp(0.08, 0.28, p.peakiness) * lerp(0.45, 1, depth)
+      const amplitude = unit * scale
+      const treelineY = baseline - p.treeline * unit
+      const snowlineY = baseline - lerp(1.5, 0.75, p.snow) * unit
       const r = ridge(env, rng.fork(`ridge-${i}`), {
         depth,
         baseline,
@@ -86,28 +68,33 @@ export default defineTheme({
               ]
             : [],
         rim: smoothstep((depth - 0.1) / 0.45),
+        lowers:
+          lakeIndex >= 0 && i > lakeIndex
+            ? [{ x: lakeX, width: lakeWidth * 0.42, amount: lerp(0.08, 0.2, (i - lakeIndex) / (depths.length - lakeIndex)) }]
+            : [],
         behind,
         light: sunAt,
+        snowline: !near && p.snow > 0.05 ? snowlineY : undefined,
       })
       layers.push(r)
       behind = r.edge
+      if (i === lakeIndex) {
+        layers.push(...lake(env, lakeRng.fork('water'), { x: lakeX, width: lakeWidth, waterline: baseline + 0.004, depth: depth - 0.012, glitter: sunAt[0] }))
+      }
       if (i <= heroIndex + 1 && !near) {
         layers.push(sunHaze(env, { at: [sunAt[0], p.horizon], depth: depth - 0.005, radius: env.aspect * 0.45, strength: i === 0 ? 0.45 : 0.25 }))
       }
 
-      const forested = rng.fork(`forested-${i}`)
-      if (i > 0 && !near && forested.chance(0.65)) {
+      if (i > 0 && !near) {
         const h = lerp(0.05, 0.012, depth)
-        const kind = forested.weighted({ full: 3, belt: 4, patches: 2.5 })
-        const reach = kind === 'full' ? forested.range(0.85, 1.05) : kind === 'belt' ? forested.range(0.25, 0.6) : forested.range(0.4, 0.8)
         layers.push(
           forest(env, rng.fork(`forest-${i}`), {
             on: r,
-            treeline: baseline - amplitude * reach,
+            treeline: treelineY,
+            fringe: unit * 0.22,
             height: [h * 0.6, h],
-            density: lerp(0.6, 1.2, p.forest),
+            density: p.forest,
             tone: lerp(0.6, 0.32, depth),
-            clearing: kind === 'patches' ? 0.55 : kind === 'full' ? 0.05 : 0.2,
           }),
         )
       }
@@ -116,10 +103,10 @@ export default defineTheme({
           forest(env, rng.fork('near-forest'), {
             on: r,
             treeline: baseline - amplitude * 3,
+            fringe: 0.01,
             height: [0.045, 0.095],
-            density: 1.1,
+            density: lerp(0.75, 1, p.forest),
             tone: 0.35,
-            clearing: 0.12,
           }),
         )
       }

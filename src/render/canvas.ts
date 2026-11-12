@@ -49,14 +49,24 @@ function drawShape(ctx: Ctx2D, shape: Shape, layerAlpha: number) {
   }
 }
 
-export function drawLayers(ctx: Ctx2D, layers: Layer[], { height, aspect, t }: { height: number; aspect: number; t?: number }) {
+export function drawLayers(
+  ctx: Ctx2D,
+  layers: Layer[],
+  { height, aspect, t, ignoreClip = false }: { height: number; aspect: number; t?: number; ignoreClip?: boolean },
+) {
   ctx.save()
   ctx.setTransform(height, 0, 0, height, 0, 0)
   for (const layer of layers) {
     const { shift, alpha } = t === undefined ? REST : motionAt(layer, t)
     if (alpha <= 0) continue
+    const clipped = !!layer.clip && !ignoreClip
+    if (clipped) {
+      ctx.save()
+      ctx.clip(new Path2D(layer.clip))
+    }
     if (shift === 0) {
       for (const shape of layer.shapes) drawShape(ctx, shape, alpha)
+      if (clipped) ctx.restore()
       continue
     }
     const offset = Math.round(shift * aspect * height) / height
@@ -69,6 +79,7 @@ export function drawLayers(ctx: Ctx2D, layers: Layer[], { height, aspect, t }: {
       for (const shape of layer.shapes) drawShape(ctx, shape, alpha)
       ctx.restore()
     }
+    if (clipped) ctx.restore()
   }
   ctx.restore()
 }

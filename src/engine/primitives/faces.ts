@@ -1,6 +1,6 @@
 import { mix, withAlpha, type Color } from '../color'
 import { sampleEdge } from '../geometry'
-import { lerp } from '../math'
+import { clamp, lerp } from '../math'
 import { MOOD_LIGHT } from '../moods'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
@@ -13,97 +13,150 @@ export interface FacesOptions {
   amplitude: number
   light: Vec
   strength?: number
-  maxPeaks?: number
 }
 
-export function mountainFaces(env: Env, rng: Rng, edge: Vec[], { depth, baseline, amplitude, light, strength = 1, maxPeaks = 3 }: FacesOptions): Shape[] {
+interface Extremum {
+  i: number
+  kind: 'peak' | 'col'
+}
+
+interface Fold {
+  kind: 'ridge' | 'valley'
+  origin: number
+  line: Vec[]
+}
+
+function alternatingExtrema(ys: number[], window: number, prominence: number): Extremum[] {
+  const raw: Extremum[] = []
+  for (let i = window; i < ys.length - window; i++) {
+    let peak = true
+    let col = true
+    for (let k = i - window; k <= i + window; k++) {
+      if (ys[k] < ys[i]) peak = false
+      if (ys[k] > ys[i]) col = false
+    }
+    const kind = peak ? 'peak' : col ? 'col' : undefined
+    if (!kind) continue
+    const last = raw[raw.length - 1]
+    if (last && last.kind === kind) {
+      if ((kind === 'peak' && ys[i] < ys[last.i]) || (kind === 'col' && ys[i] > ys[last.i])) last.i = i
+    } else raw.push({ i, kind })
+  }
+  for (;;) {
+    let weakest = -1
+    let weakestDrop = prominence
+    for (let k = 0; k < raw.length - 1; k++) {
+      const drop = Math.abs(ys[raw[k].i] - ys[raw[k + 1].i])
+      if (drop < weakestDrop) {
+        weakestDrop = drop
+        weakest = k
+      }
+    }
+    if (weakest < 0) break
+    raw.splice(weakest, 2)
+    for (let k = 1; k < raw.length; k++) {
+      if (raw[k].kind !== raw[k - 1].kind) continue
+      const keepLater = raw[k].kind === 'peak' ? ys[raw[k].i] < ys[raw[k - 1].i] : ys[raw[k].i] > ys[raw[k - 1].i]
+      raw.splice(keepLater ? k - 1 : k, 1)
+      k--
+    }
+  }
+  return raw
+}
+
+export function mountainFaces(env: Env, rng: Rng, edge: Vec[], { depth, baseline, amplitude, light, strength = 1 }: FacesOptions): Shape[] {
   if (strength <= 0) return []
   const period = env.aspect
-  const yAt = (x: number) => sampleEdge(edge, x - period * Math.floor(x / period))
-  const step = edge[1][0] - edge[0][0]
+  const ground = (x: number) => sampleEdge(edge, x - period * Math.floor(x / period))
+  const cells = Math.max(8, Math.round(period / (edge[1][0] - edge[0][0])))
+  const step = period / cells
   const xs: number[] = []
-  for (let x = -period * 0.5; x <= period * 1.5; x += step) xs.push(x)
-  const ys = xs.map(yAt)
-  const win = Math.max(3, Math.round(0.05 / step))
-  const highEnough = baseline - amplitude * 0.35
-
-  const peaks: number[] = []
-  for (let i = win; i < xs.length - win; i++) {
-    if (xs[i] < 0 || xs[i] >= period || ys[i] > highEnough) continue
-    let isPeak = true
-    for (let k = i - win; k <= i + win && isPeak; k++) if (ys[k] < ys[i]) isPeak = false
-    if (isPeak && (!peaks.length || i - peaks[peaks.length - 1] > win)) peaks.push(i)
+  for (let n = -Math.floor(cells / 2); n <= Math.ceil(cells * 1.5); n++) xs.push(n * step)
+  const cell = (i: number) => ((Math.round(xs[i] / step) % cells) + cells) % cells
+  const ys = xs.map(ground)
+  const bottom = baseline + amplitude * 0.35
+  const sunward = (x: number) => {
+    const dx = light[0] - x
+    return Math.sign(dx - period * Math.round(dx / period)) || 1
+  }
+  const found = alternatingExtrema(ys, Math.max(2, Math.round(0.012 / step)), amplitude * 0.12)
+  const canonical = found.filter((e) => xs[e.i] >= 0 && xs[e.i] < period).map((e) => ({ n: cell(e.i), kind: e.kind }))
+  if (canonical.length > 1 && canonical[0].kind === canonical[canonical.length - 1].kind) canonical.pop()
+  const m = canonical.length
+  if (m < 2) return []
+  const at = (k: number) => {
+    const wrap = Math.floor(k / m)
+    const e = canonical[k - wrap * m]
+    const x = e.n * step + wrap * period
+    return { x, y: ground(x), kind: e.kind, n: e.n }
   }
 
-  const base = env.palette.atDepth(depth)
+  const endOf = (k: number) => {
+    const e = at(k)
+    const r = rng.fork(`lean-${e.n}`)
+    const lean = -sunward(e.x) * (e.kind === 'peak' ? r.range(0.1, 0.28) : r.range(0.14, 0.32))
+    const shift = lean * (bottom - e.y)
+    const neighbor = at(k + (shift > 0 ? 1 : -1))
+    return e.x + Math.sign(shift) * Math.min(Math.abs(shift), Math.abs(neighbor.x - e.x) * 0.45)
+  }
+
+  const foldOf = (k: number): Fold => {
+    const e = at(k)
+    const r = rng.fork(`fold-${e.n}`)
+    const ex = endOf(k)
+    const room = Math.min(ex - endOf(k - 1), endOf(k + 1) - ex)
+    const line: Vec[] = [[e.x, e.y + 0.0008]]
+    const kinks = 3
+    for (let s = 1; s <= kinks; s++) {
+      const t = s / (kinks + 1)
+      const x = lerp(e.x, ex, t) + r.range(-0.12, 0.12) * room * t
+      line.push([x, Math.max(lerp(e.y, bottom, t), ground(x) + 0.0015)])
+    }
+    line.push([ex, Math.max(bottom, ground(ex) + 0.002)])
+    return { kind: e.kind === 'peak' ? 'ridge' : 'valley', origin: k, line }
+  }
+  const folds: Fold[] = Array.from({ length: m + 1 }, (_, k) => foldOf(k))
+
   const { ink, skyTop, light: lightColor } = env.palette.anchors
-  const shadowColor = mix(base, mix(ink, skyTop, 0.35), lerp(0.42, 0.14, depth) * strength)
-  const litColor = withAlpha(lightColor, lerp(0.1, 0.04, depth) * strength * MOOD_LIGHT[env.palette.mood].lit)
-  const bottom = baseline + amplitude * 0.3
-  const maxReach = Math.max(0.12, amplitude * 2.2)
+  const mood = MOOD_LIGHT[env.palette.mood]
+  const shadowColor = mix(ink, skyTop, 0.35)
+  const far = lerp(1, 0.7, clamp((depth - 0.35) / 0.65))
   const shapes: Shape[] = []
 
-  const valleyFrom = (i: number, dir: 1 | -1) => {
-    let valley = i
-    for (let j = i + dir; j > 0 && j < xs.length - 1 && Math.abs(xs[j] - xs[i]) < maxReach; j += dir) {
-      if (ys[j] < ys[i]) break
-      if (ys[j] > ys[valley]) valley = j
-    }
-    return valley
-  }
-
-  const push = (outline: Vec[], fill: Shape['fill']) => {
-    const minX = Math.min(...outline.map(([x]) => x))
-    const maxX = Math.max(...outline.map(([x]) => x))
-    for (const offset of [0, -period, period]) {
-      if (minX + offset > period + 0.01 || maxX + offset < -0.01) continue
-      shapes.push({ d: polygon(outline.map(([x, y]) => [x + offset, y])), fill })
-    }
-  }
-
-  const candidates = peaks
-    .map((i) => {
-      const shadowDir: 1 | -1 = light[0] < xs[i] ? 1 : -1
-      const shadowValley = valleyFrom(i, shadowDir)
-      const litValley = valleyFrom(i, (-shadowDir) as 1 | -1)
-      return { i, shadowDir, shadowValley, litValley, drop: Math.min(ys[shadowValley], ys[litValley]) - ys[i] }
-    })
-    .filter((c) => c.drop >= amplitude * 0.25)
-    .sort((a, b) => b.drop - a.drop)
-    .slice(0, maxPeaks)
-
-  for (const { i, shadowDir, shadowValley, litValley } of candidates) {
-    const r = rng.fork(`peak-${Math.round(xs[i] * 1000)}`)
-    const span = Math.abs(xs[shadowValley] - xs[i])
-    const peak: Vec = [xs[i], ys[i]]
-    const foot: Vec = [xs[i] + shadowDir * span * r.range(0.08, 0.4), bottom]
-    const crease: Vec[] = [peak]
-    const segments = 4
-    for (let s = 1; s < segments; s++) {
-      const t = s / segments
-      const x = lerp(peak[0], foot[0], t) + r.range(-0.08, 0.08) * span
-      crease.push([x, Math.max(lerp(peak[1], foot[1], t ** 0.85), yAt(x) + amplitude * 0.04)])
-    }
-    crease.push(foot)
-
-    const slope = (from: number, to: number) => {
-      const points: Vec[] = []
-      const dir = to > from ? 1 : -1
-      for (let j = from; j !== to + dir; j += dir) points.push([xs[j], ys[j]])
-      return points
-    }
-    const fade = (color: Color): Shape['fill'] => ({
+  const push = (outline: Vec[], color: Color, top: number) => {
+    const a = color.a ?? 1
+    const fill: Shape['fill'] = {
       type: 'linear',
-      from: [0, peak[1]],
+      from: [0, top],
       to: [0, bottom],
       stops: [
         [0, color],
-        [0.6, withAlpha(color, (color.a ?? 1) * 0.8)],
-        [1, withAlpha(color, (color.a ?? 1) * 0.25)],
+        [0.6, withAlpha(color, a * 0.9)],
+        [1, withAlpha(color, 0)],
       ],
-    })
-    push([...crease, ...slope(shadowValley, i)], fade(shadowColor))
-    push([...crease, ...slope(litValley, i)], fade(litColor))
+    }
+    for (const offset of [0, -period, period]) shapes.push({ d: polygon(outline.map(([x, y]) => [x + offset, y])), fill })
+  }
+
+  for (let k = 0; k < m; k++) {
+    const left = folds[k]
+    const right = folds[k + 1]
+    const lx = left.line[0][0]
+    const rx = right.line[0][0]
+    const cx = (lx + rx) / 2
+    const silhouette: Vec[] = []
+    for (let x = lx; x < rx; x += step) silhouette.push([x, ground(x)])
+    silhouette.push([rx, ground(rx)])
+    const outline = [...silhouette, ...right.line.slice(1), ...[...left.line].reverse().slice(0, -1)]
+    const side = left.kind === 'ridge' ? 1 : -1
+    const rise = Math.abs(ground(rx) - ground(lx)) / Math.max(1e-6, rx - lx)
+    const facing = side * clamp(0.45 + rise * 0.6, 0.45, 1)
+    const lit = facing * sunward(cx)
+    const top = Math.min(ground(lx), ground(rx))
+    if (lit > 0.7) push(outline, withAlpha(lightColor, 0.22 * mood.lit * strength * far), top)
+    else if (lit > 0) push(outline, withAlpha(lightColor, 0.1 * mood.lit * strength * far), top)
+    else if (lit > -0.7) push(outline, withAlpha(shadowColor, 0.28 * strength * far), top)
+    else push(outline, withAlpha(shadowColor, 0.45 * strength * far), top)
   }
   return shapes
 }

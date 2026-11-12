@@ -6,6 +6,7 @@ import type { Rng } from '../rng'
 import type { Layer, Vec } from '../scene'
 import type { Env } from '../theme'
 import { mountainFaces } from './faces'
+import { snowCap } from './snow'
 
 export interface RidgeOptions {
   depth: number
@@ -18,7 +19,8 @@ export interface RidgeOptions {
   light?: Vec
   faces?: number
   peakBoost?: number
-  mesa?: boolean
+  lowers?: { x: number; width: number; amount: number }[]
+  snowline?: number
   dips?: { x: number; width: number; amount: number }[]
 }
 
@@ -67,7 +69,7 @@ function peakProfile(rng: Rng, period: number, spacing: number) {
   }
 }
 
-export function ridge(env: Env, rng: Rng, { depth, baseline, amplitude, frequency, peak, rim, behind, light, faces = 1, peakBoost = 0.45, mesa = false, dips = [] }: RidgeOptions): Layer {
+export function ridge(env: Env, rng: Rng, { depth, baseline, amplitude, frequency, peak, rim, behind, light, faces = 1, peakBoost = 0.45, lowers = [], dips = [], snowline }: RidgeOptions): Layer {
   const period = env.aspect
   const freq = frequency ?? lerp(2.4, 1.1, depth)
   const soft = loopNoise1D(rng.fork('soft'))
@@ -97,10 +99,12 @@ export function ridge(env: Env, rng: Rng, { depth, baseline, amplitude, frequenc
 
   const min = Math.min(...hs)
   const max = Math.max(...hs)
-  const shape = (h: number) => (mesa ? smoothstep((h - 0.3) / 0.22) * (0.45 + 0.55 * h) : h)
-  const edge: Vec[] = xs.map((x, i) => [x, baseline - amplitude * shape((hs[i] - min) / (max - min || 1))])
+  const edge: Vec[] = xs.map((x, i) => [x, baseline - amplitude * ((hs[i] - min) / (max - min || 1))])
   const shift = avoidTangents(edge, behind)
-  for (const p of edge) p[1] += shift
+  for (const p of edge) {
+    p[1] += shift
+    for (const low of lowers) p[1] += low.amount * bump(p[0], low.x, low.width, period)
+  }
 
   return {
     id: `ridge@${depth.toFixed(2)}`,
@@ -111,6 +115,7 @@ export function ridge(env: Env, rng: Rng, { depth, baseline, amplitude, frequenc
     wrap: true,
     shapes: [
       { d: polygon([[edge[0][0], 1.01], ...edge, [edge[edge.length - 1][0], 1.01]]) },
+      ...(snowline !== undefined ? snowCap(env, rng.fork('snow'), edge, { depth, amplitude, snowline }) : []),
       ...(light
         ? mountainFaces(env, rng.fork('faces'), edge, {
             depth,
@@ -118,7 +123,6 @@ export function ridge(env: Env, rng: Rng, { depth, baseline, amplitude, frequenc
             amplitude,
             light,
             strength: faces * smoothstep((depth - 0.2) / 0.35),
-            maxPeaks: Math.round(lerp(4, 2, depth)),
           })
         : []),
     ],
