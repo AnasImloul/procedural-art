@@ -98,6 +98,7 @@ export function renderSvg(scene: Scene, { mode, height = 1080 }: { mode: SvgMode
   for (const layer of scene.layers) {
     const shapes = layer.shapes.map((s) => shapeMarkup(defs, s, mode)).join('')
     const { alpha } = motionAt(layer, 0)
+    if (alpha <= 0) continue
     let clip = ''
     if (layer.clip) {
       const id = `clip-${clips.size}`

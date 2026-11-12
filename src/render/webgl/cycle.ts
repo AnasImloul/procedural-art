@@ -5,6 +5,7 @@ import { MOON_COLOR, MOON_GLOW } from '../../engine/primitives/sun'
 import type { Palette } from '../../engine/palette'
 import type { PostFx } from '../../engine/scene'
 import { GRAIN_REFERENCE_HEIGHT, grainSeeds } from '../grain'
+import type { KeyframePart, RunInfo } from '../jobs'
 import { compile, POST } from './compositor'
 
 const CROSSFADE = `#version 300 es
@@ -13,11 +14,19 @@ uniform sampler2D uA;
 uniform sampler2D uB;
 uniform float uW;
 uniform float uShift;
+uniform vec2 uBandA;
+uniform vec2 uBandB;
 in vec2 vUv;
 out vec4 outColor;
+vec4 band(sampler2D tex, vec2 rows, float x, float y) {
+  float h = rows.y - rows.x;
+  if (h <= 0.0 || y < rows.x || y > rows.y) return vec4(0.0);
+  return texture(tex, vec2(x, (y - rows.x) / h));
+}
 void main() {
-  vec2 uv = vec2(vUv.x - uShift, 1.0 - vUv.y);
-  outColor = mix(texture(uA, uv), texture(uB, uv), uW);
+  float x = vUv.x - uShift;
+  float y = 1.0 - vUv.y;
+  outColor = mix(band(uA, uBandA, x, y), band(uB, uBandB, x, y), uW);
 }`
 
 const BODY = `#version 300 es
@@ -60,15 +69,20 @@ export interface CycleSource {
   aspect: number
   orbit: Orbit & { radius: number; glow: number }
   post: PostFx
-  runs: number[]
+  runs: RunInfo[]
   paletteAt(hour: number): Palette
 }
 
-export type KeyframeLoader = (hour: number, width: number, height: number) => Promise<ImageBitmap[]>
+export type KeyframeLoader = (hour: number, width: number, height: number) => Promise<KeyframePart[]>
+
+interface Band {
+  texture: WebGLTexture
+  rows: [number, number]
+}
 
 interface Keyframe {
-  backdrop: WebGLTexture
-  runs: WebGLTexture[]
+  backdrop: Band
+  runs: Band[]
   used: number
 }
 
@@ -152,7 +166,11 @@ export class CycleCompositor {
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     this.drawBodies(hour, palette)
-    source.runs.forEach((wraps, r) => {
+    source.runs.forEach(({ wraps, pose }, r) => {
+      if (pose) {
+        const u = pose.cycles * t
+        if (Math.floor((u - Math.floor(u)) * pose.of) !== pose.index) return
+      }
       const shift = wraps * t
       this.drawCrossfade(a.runs[r], b.runs[r], w, shift - Math.floor(shift))
     })
@@ -202,10 +220,10 @@ export class CycleCompositor {
       this.pending.delete(k)
       if (generation !== this.generation || runs.length !== expected) {
         if (runs.length !== expected) console.warn(`Keyframe ${hour}: expected ${expected} runs, got ${runs.length}`)
-        for (const bitmap of [backdrop, ...runs]) bitmap.close()
+        for (const part of [backdrop, ...runs]) part.bitmap.close()
         return
       }
-      this.frames.set(k, { backdrop: this.upload(backdrop, false), runs: runs.map((bitmap) => this.upload(bitmap, true)), used: ++this.clock })
+      this.frames.set(k, { backdrop: this.upload(backdrop, false), runs: runs.map((part) => this.upload(part, true)), used: ++this.clock })
       this.evict()
     })
     this.pending.set(k, promise)
@@ -225,11 +243,11 @@ export class CycleCompositor {
   }
 
   private deleteFrame(f: Keyframe) {
-    this.gl.deleteTexture(f.backdrop)
-    for (const t of f.runs) this.gl.deleteTexture(t)
+    this.gl.deleteTexture(f.backdrop.texture)
+    for (const band of f.runs) this.gl.deleteTexture(band.texture)
   }
 
-  private upload(bitmap: ImageBitmap, repeat: boolean): WebGLTexture {
+  private upload({ bitmap, top, bottom }: KeyframePart, repeat: boolean): Band {
     const { gl } = this
     const texture = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, texture)
@@ -239,20 +257,23 @@ export class CycleCompositor {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap)
     bitmap.close()
-    return texture
+    return { texture, rows: [top, bottom] }
   }
 
-  private drawCrossfade(a: WebGLTexture, b: WebGLTexture, w: number, shift = 0) {
+  private drawCrossfade(a: Band, b: Band, w: number, shift = 0) {
     const { gl } = this
     gl.useProgram(this.crossfade)
-    gl.uniform1f(gl.getUniformLocation(this.crossfade, 'uShift'), shift)
+    const u = (name: string) => gl.getUniformLocation(this.crossfade, name)
+    gl.uniform1f(u('uShift'), shift)
+    gl.uniform2f(u('uBandA'), ...a.rows)
+    gl.uniform2f(u('uBandB'), ...b.rows)
     gl.uniform1i(gl.getUniformLocation(this.crossfade, 'uA'), 0)
     gl.uniform1i(gl.getUniformLocation(this.crossfade, 'uB'), 1)
     gl.uniform1f(gl.getUniformLocation(this.crossfade, 'uW'), w)
     gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, a)
+    gl.bindTexture(gl.TEXTURE_2D, a.texture)
     gl.activeTexture(gl.TEXTURE1)
-    gl.bindTexture(gl.TEXTURE_2D, b)
+    gl.bindTexture(gl.TEXTURE_2D, b.texture)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     gl.activeTexture(gl.TEXTURE0)
   }

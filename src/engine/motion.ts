@@ -18,7 +18,10 @@ export function motionAt(layer: Layer, t: number): MotionState {
   for (const m of layer.motion) {
     if (m.type === 'drift') shift += m.wraps * t
     else if (m.type === 'sway') shift += m.amount * Math.sin(TAU * m.cycles * t)
-    else alpha *= 1 - (m.amount * (1 - Math.cos(TAU * m.cycles * t + (m.phase ?? 0)))) / 2
+    else if (m.type === 'pose') {
+      const u = m.cycles * t
+      alpha *= Math.floor((u - Math.floor(u)) * m.of) === m.index ? 1 : 0
+    } else alpha *= 1 - (m.amount * (1 - Math.cos(TAU * m.cycles * t + (m.phase ?? 0)))) / 2
   }
   return { shift: layer.wrap ? shift - Math.floor(shift) : 0, alpha }
 }

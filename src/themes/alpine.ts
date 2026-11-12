@@ -1,5 +1,5 @@
 import { lerp, smoothstep } from '@/engine/math'
-import { cloudscape, fogBand, forest, lake, lightShafts, ridge, sky, stars, sun, sunHaze, treeline } from '@/engine/primitives'
+import { birds, cloudscape, fogBand, forest, lake, lightShafts, ridge, sky, stars, sun, sunHaze, treeline } from '@/engine/primitives'
 import type { Layer, Vec } from '@/engine/scene'
 import { defineTheme, param } from '@/engine/theme'
 
@@ -24,9 +24,10 @@ export default defineTheme({
     clouds: param.range(0, 1),
     rays: param.chance(0.6),
     lake: param.chance(0.35),
+    birds: param.chance(0.5),
   },
 
-  compose({ env, loop, cycle, rng, p, palette, comp }) {
+  compose({ env, loop, cycle, seconds, rng, p, palette, comp }) {
     const layers: Layer[] = [sky(env, { horizon: p.horizon })]
     if (palette.mood === 'night') layers.push(...stars(env, rng.fork('stars'), { horizon: p.horizon }))
     if (palette.mood === 'dawn') layers.push(...stars(env, rng.fork('stars'), { horizon: p.horizon, density: 0.3, brightness: 0.35 }))
@@ -37,6 +38,10 @@ export default defineTheme({
 
     const cloudDirection = rng.fork('wind').chance(0.5) ? 1 : -1
     layers.push(...cloudscape(env, rng.fork('clouds'), { horizon: p.horizon, amount: p.clouds, light: sunAt, direction: cloudDirection, anchor: comp.focal.x }))
+    if (p.birds && (cycle || palette.mood !== 'night')) {
+      const visible = palette.mood !== 'night'
+      layers.push(...birds(env, rng.fork('birds'), { horizon: p.horizon, anchor: comp.focal.x, direction: cloudDirection, seconds, visible }))
+    }
 
     const depths = comp.depthSteps(p.ridges, { near: 0.1, far: 0.95 })
     const heroIndex = depths.length >= 5 ? 1 : 0

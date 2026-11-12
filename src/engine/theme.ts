@@ -31,6 +31,7 @@ export interface ComposeContext<P> {
   env: Env
   loop: LoopMode
   cycle: boolean
+  seconds: number
   rng: Rng
   p: P
   palette: Palette
@@ -89,7 +90,7 @@ export function cyclePalette(theme: Theme, seed: string, hour: number): Palette 
 }
 
 function stillForCycle(layers: Layer[]): Layer[] {
-  return layers.map((layer) => (layer.motion ? { ...layer, motion: layer.clip ? undefined : layer.motion.filter((m) => m.type === 'drift') } : layer))
+  return layers.map((layer) => (layer.motion ? { ...layer, motion: layer.clip ? undefined : layer.motion.filter((m) => m.type === 'drift' || m.type === 'pose') } : layer))
 }
 
 function withPan(layers: Layer[], speed: number): Layer[] {
@@ -112,6 +113,7 @@ export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect,
   const pan = { ...DEFAULT_PAN, ...theme.loop?.pan }
   const cycleSeconds = theme.loop?.cycle ?? DEFAULT_CYCLE_SECONDS
   const panSpeed = cycle ? (pan.speed * cycleSeconds) / pan.seconds : pan.speed
+  const seconds = cycle ? cycleSeconds : loop === 'pan' ? pan.seconds : (theme.loop?.seconds ?? 12)
 
   let best: Scene | undefined
   let bestScore = Infinity
@@ -121,6 +123,7 @@ export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect,
       env: { palette, aspect },
       loop,
       cycle,
+      seconds,
       rng: layout.fork('layers'),
       p: params,
       palette,
@@ -132,7 +135,7 @@ export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect,
       aspect,
       palette,
       params,
-      loop: { mode: loop, cycle, seconds: cycle ? cycleSeconds : loop === 'pan' ? pan.seconds : (theme.loop?.seconds ?? 12) },
+      loop: { mode: loop, cycle, seconds },
       layers: cycle ? stillForCycle(finalize(panned, palette, theme.outline)) : finalize(panned, palette, theme.outline),
       post: { ...DEFAULT_POST, ...theme.post },
       attempt,

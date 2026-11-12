@@ -15,7 +15,7 @@ export function cycleSource(theme: Theme, state: ViewState, scene: Scene): Cycle
     aspect: scene.aspect,
     orbit,
     post: scene.post,
-    runs: keyframeRuns(scene).map((run) => run.wraps),
+    runs: keyframeRuns(scene).map(({ wraps, pose }) => ({ wraps, pose })),
     paletteAt: (hour) => cyclePalette(theme, state.seed, hour),
   }
 }

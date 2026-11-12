@@ -1,6 +1,6 @@
-import { renderKeyframe, renderToBlob, type KeyframeJob, type RenderJob } from './jobs'
+import { renderKeyframe, renderToBlob, type KeyframeJob, type KeyframePart, type RenderJob } from './jobs'
 
-type WorkerMessage = { ready: boolean } | { result: Blob | ImageBitmap[] } | { error: string }
+type WorkerMessage = { ready: boolean } | { result: Blob | KeyframePart[] } | { error: string }
 
 interface Task {
   job: RenderJob | KeyframeJob
@@ -41,8 +41,8 @@ export class RenderPool {
     return this.enqueue<Blob>(job)
   }
 
-  keyframe(job: KeyframeJob): RenderHandle<ImageBitmap[]> {
-    return this.enqueue<ImageBitmap[]>(job)
+  keyframe(job: KeyframeJob): RenderHandle<KeyframePart[]> {
+    return this.enqueue<KeyframePart[]>(job)
   }
 
   private enqueue<T>(job: RenderJob | KeyframeJob): RenderHandle<T> {

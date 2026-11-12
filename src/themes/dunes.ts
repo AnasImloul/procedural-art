@@ -1,7 +1,7 @@
 import { lerp, smoothstep } from '@/engine/math'
 import { mix, oklch } from '@/engine/color'
 import { sampleEdge } from '@/engine/geometry'
-import { cloudscape, deadTree, dunes, fogBand, lightShafts, mesas, sandWisps, scrub, sky, stars, sun, sunHaze } from '@/engine/primitives'
+import { birds, cloudscape, deadTree, dunes, fogBand, lightShafts, mesas, sandWisps, scrub, sky, stars, sun, sunHaze } from '@/engine/primitives'
 import { solid, type Layer, type Vec } from '@/engine/scene'
 import { defineTheme, param } from '@/engine/theme'
 
@@ -39,9 +39,10 @@ export default defineTheme({
     scrub: param.range(0.3, 1),
     wind: param.range(0.2, 1),
     tree: param.chance(0.55),
+    birds: param.chance(0.4),
   },
 
-  compose({ env, loop, cycle, rng, p, palette, comp }) {
+  compose({ env, loop, cycle, seconds, rng, p, palette, comp }) {
     const layers: Layer[] = [sky(env, { horizon: p.horizon })]
     if (palette.mood === 'night') layers.push(...stars(env, rng.fork('stars'), { horizon: p.horizon, density: 1.3 }))
     const heavens = comp.celestial(p.horizon)
@@ -58,6 +59,11 @@ export default defineTheme({
         anchor: comp.focal.x,
       }),
     )
+    if (p.birds && (cycle || palette.mood !== 'night')) {
+      const direction = comp.focal.side === 'left' ? -1 : 1
+      const visible = palette.mood !== 'night'
+      layers.push(...birds(env, rng.fork('birds'), { horizon: p.horizon, anchor: comp.focal.x, direction, seconds, count: [3, 7], visible }))
+    }
 
     let behind: Vec[] | undefined
     if (p.mesas) {

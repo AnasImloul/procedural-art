@@ -6,8 +6,8 @@ self.onmessage = async (e: MessageEvent<{ job: RenderJob | KeyframeJob }>) => {
   const { job } = e.data
   try {
     if ('keyframe' in job) {
-      const bitmaps = await renderKeyframe(job)
-      self.postMessage({ result: bitmaps }, { transfer: bitmaps })
+      const parts = await renderKeyframe(job)
+      self.postMessage({ result: parts }, { transfer: parts.map((part) => part.bitmap) })
     } else {
       self.postMessage({ result: await renderToBlob(job) })
     }

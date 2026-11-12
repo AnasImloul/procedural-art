@@ -22,6 +22,7 @@ export type Motion =
   | { type: 'drift'; wraps: number }
   | { type: 'sway'; amount: number; cycles: number }
   | { type: 'fade'; amount: number; cycles: number; phase?: number }
+  | { type: 'pose'; cycles: number; index: number; of: number }
 
 export interface Layer {
   id: string
@@ -102,7 +103,7 @@ export function finalize(layers: Layer[], palette: Palette, outline: 'rim' | 'co
     })
   return finished.flatMap((layer, i) =>
     layer.lake && layer.clip
-      ? [...finished.slice(0, i).filter((l) => !l.lake && l.role !== 'water').map((l) => reflect(l, layer.lake!.waterline, layer.clip!)), layer]
+      ? [...finished.slice(0, i).filter((l) => !l.lake && l.role !== 'water' && !l.motion?.some((m) => m.type === 'pose')).map((l) => reflect(l, layer.lake!.waterline, layer.clip!)), layer]
       : [layer],
   )
 }
