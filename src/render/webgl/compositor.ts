@@ -3,6 +3,7 @@ import { isAnimated, motionAt, REST } from '../../engine/motion'
 import type { Layer, Scene } from '../../engine/scene'
 import { drawLayers } from '../canvas'
 import { GRAIN_REFERENCE_HEIGHT, grainSeeds } from '../grain'
+import { PAPER_RANGE, PAPER_TILE, paperBytes } from '../paper'
 
 const VERTEX = `#version 300 es
 in vec2 aPos;
@@ -30,6 +31,8 @@ export const POST = `#version 300 es
 precision highp float;
 precision highp int;
 uniform sampler2D uTex;
+uniform sampler2D uPaper;
+uniform float uPaperAmount;
 uniform vec2 uSize;
 uniform float uGrain;
 uniform float uCell;
@@ -53,6 +56,7 @@ void main() {
   float outer = length(uSize) * 0.5;
   float d = length(px + 0.5 - uSize * 0.5);
   color = mix(color, uInk, clamp((d - outer * 0.45) / (outer * 0.55), 0.0, 1.0) * uVignette);
+  color *= 1.0 + (texture(uPaper, (px + 0.5) / uSize.y).r - 0.5) * ${PAPER_RANGE.toFixed(4)} * uPaperAmount;
   uvec2 cell = uvec2(floor(px / uCell));
   color += (cellNoise(cell.x, cell.y, uSeed) + cellNoise(cell.x, cell.y, uSeed2) - 1.0) * uGrain;
   outColor = vec4(color, 1.0);
@@ -62,6 +66,26 @@ interface Group {
   texture: WebGLTexture
   layer?: Layer
   mask?: WebGLTexture
+}
+
+export function paperTexture(gl: WebGL2RenderingContext): WebGLTexture {
+  const texture = gl.createTexture()!
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, PAPER_TILE, PAPER_TILE, 0, gl.RGBA, gl.UNSIGNED_BYTE, paperBytes())
+  return texture
+}
+
+export function bindPaper(gl: WebGL2RenderingContext, program: WebGLProgram, texture: WebGLTexture, amount: number) {
+  gl.uniform1i(gl.getUniformLocation(program, 'uTex'), 0)
+  gl.uniform1i(gl.getUniformLocation(program, 'uPaper'), 1)
+  gl.uniform1f(gl.getUniformLocation(program, 'uPaperAmount'), amount)
+  gl.activeTexture(gl.TEXTURE1)
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  gl.activeTexture(gl.TEXTURE0)
 }
 
 export function compile(gl: WebGL2RenderingContext, fragment: string): WebGLProgram {
@@ -96,6 +120,7 @@ export class Compositor {
 
   private readonly layerProgram: WebGLProgram
   private readonly postProgram: WebGLProgram
+  private readonly paper: WebGLTexture
   private readonly vao: WebGLVertexArrayObject
   private readonly scratch = document.createElement('canvas')
   private fbo: WebGLFramebuffer | null = null
@@ -109,6 +134,7 @@ export class Compositor {
   private constructor(private readonly gl: WebGL2RenderingContext) {
     this.layerProgram = compile(gl, LAYER)
     this.postProgram = compile(gl, POST)
+    this.paper = paperTexture(gl)
     this.vao = gl.createVertexArray()!
     gl.bindVertexArray(this.vao)
     const buffer = gl.createBuffer()
@@ -188,6 +214,7 @@ export class Compositor {
     gl.uniform3f(u('uInk'), ...ink)
     gl.uniform1ui(u('uSeed'), seed)
     gl.uniform1ui(u('uSeed2'), seed2)
+    bindPaper(gl, this.postProgram, this.paper, scene.post.paper)
     gl.bindTexture(gl.TEXTURE_2D, this.fboTexture)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
   }
@@ -199,6 +226,7 @@ export class Compositor {
     if (this.fbo) gl.deleteFramebuffer(this.fbo)
     gl.deleteProgram(this.layerProgram)
     gl.deleteProgram(this.postProgram)
+    gl.deleteTexture(this.paper)
   }
 
   private resize(width: number, height: number) {

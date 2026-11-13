@@ -2,6 +2,7 @@ import { toRgb, withAlpha, type Color } from '../engine/color'
 import { motionAt } from '../engine/motion'
 import type { Paint, Scene, Shape } from '../engine/scene'
 import { cellNoise, GRAIN_REFERENCE_HEIGHT, grainSeeds } from './grain'
+import { PAPER_TILE, paperTile } from './paper'
 
 export type SvgMode = 'clean' | 'styled'
 
@@ -89,6 +90,23 @@ function grainTile(scene: Scene): string {
   return canvas.toDataURL('image/png')
 }
 
+function paperDataUrl(amount: number): string {
+  const t = paperTile()
+  const canvas = document.createElement('canvas')
+  canvas.width = PAPER_TILE
+  canvas.height = PAPER_TILE
+  const ctx = canvas.getContext('2d')!
+  const image = ctx.createImageData(PAPER_TILE, PAPER_TILE)
+  for (let i = 0; i < t.length; i++) {
+    const m = t[i] * amount
+    const v = m > 0 ? 255 : 0
+    image.data[i * 4] = image.data[i * 4 + 1] = image.data[i * 4 + 2] = v
+    image.data[i * 4 + 3] = Math.min(255, Math.round(Math.abs(m) * 255))
+  }
+  ctx.putImageData(image, 0, 0)
+  return canvas.toDataURL('image/png')
+}
+
 export function renderSvg(scene: Scene, { mode, height = 1080 }: { mode: SvgMode; height?: number }): string {
   const defs = new Defs()
   const w = scene.aspect
@@ -124,6 +142,15 @@ export function renderSvg(scene: Scene, { mode, height = 1080 }: { mode: SvgMode
       ],
     })
     body.push(`<rect id="vignette" width="${f(w)}" height="1" fill="url(#${id})"/>`)
+  }
+
+  if (mode === 'styled' && scene.post.paper > 0) {
+    defs.add(
+      `<pattern id="paper" patternUnits="userSpaceOnUse" width="1" height="1">` +
+        `<image href="${paperDataUrl(scene.post.paper)}" width="1" height="1" preserveAspectRatio="none"/>` +
+        `</pattern>`,
+    )
+    body.push(`<rect id="paper" width="${f(w)}" height="1" fill="url(#paper)"/>`)
   }
 
   if (mode === 'styled' && scene.post.grain > 0) {

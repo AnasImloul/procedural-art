@@ -6,7 +6,7 @@ import type { Palette } from '../../engine/palette'
 import type { PostFx } from '../../engine/scene'
 import { GRAIN_REFERENCE_HEIGHT, grainSeeds } from '../grain'
 import type { KeyframePart, RunInfo } from '../jobs'
-import { compile, POST } from './compositor'
+import { bindPaper, compile, paperTexture, POST } from './compositor'
 
 const CROSSFADE = `#version 300 es
 precision highp float;
@@ -103,6 +103,7 @@ export class CycleCompositor {
   private readonly crossfade: WebGLProgram
   private readonly body: WebGLProgram
   private readonly post: WebGLProgram
+  private readonly paper: WebGLTexture
   private readonly vao: WebGLVertexArrayObject
   private fbo: WebGLFramebuffer | null = null
   private fboTexture: WebGLTexture | null = null
@@ -120,6 +121,7 @@ export class CycleCompositor {
     this.crossfade = compile(gl, CROSSFADE)
     this.body = compile(gl, BODY)
     this.post = compile(gl, POST)
+    this.paper = paperTexture(gl)
     this.vao = gl.createVertexArray()!
     gl.bindVertexArray(this.vao)
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
@@ -187,7 +189,7 @@ export class CycleCompositor {
     gl.uniform3f(u('uInk'), ...rgb(palette.anchors.ink))
     gl.uniform1ui(u('uSeed'), seed)
     gl.uniform1ui(u('uSeed2'), seed2)
-    gl.uniform1i(u('uTex'), 0)
+    bindPaper(gl, this.post, this.paper, source.post.paper)
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.fboTexture)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
@@ -200,6 +202,7 @@ export class CycleCompositor {
     if (this.fboTexture) gl.deleteTexture(this.fboTexture)
     if (this.fbo) gl.deleteFramebuffer(this.fbo)
     for (const p of [this.crossfade, this.body, this.post]) gl.deleteProgram(p)
+    gl.deleteTexture(this.paper)
   }
 
   private index(hour: number) {

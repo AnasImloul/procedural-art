@@ -2,6 +2,7 @@ import { toCss, withAlpha } from '../engine/color'
 import { motionAt, REST } from '../engine/motion'
 import type { Layer, Paint, Scene, Shape } from '../engine/scene'
 import { cellNoise, GRAIN_REFERENCE_HEIGHT, grainSeeds } from './grain'
+import { PAPER_TILE, paperTile } from './paper'
 
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
@@ -97,6 +98,37 @@ function vignette(ctx: Ctx2D, scene: Scene, width: number, height: number) {
   ctx.fillRect(0, 0, width, height)
 }
 
+function paper(ctx: Ctx2D, scene: Scene, width: number, height: number) {
+  const amount = scene.post.paper
+  if (amount <= 0) return
+  const t = paperTile()
+  const scale = height / PAPER_TILE
+  const image = ctx.getImageData(0, 0, width, height)
+  const data = image.data
+  for (let py = 0; py < height; py++) {
+    const ty = py / scale
+    const y0 = Math.floor(ty)
+    const fy = ty - y0
+    const r0 = (y0 % PAPER_TILE) * PAPER_TILE
+    const r1 = ((y0 + 1) % PAPER_TILE) * PAPER_TILE
+    for (let px = 0; px < width; px++) {
+      const tx = px / scale
+      const x0 = Math.floor(tx)
+      const fx = tx - x0
+      const c0 = x0 % PAPER_TILE
+      const c1 = (x0 + 1) % PAPER_TILE
+      const top = t[r0 + c0] + (t[r0 + c1] - t[r0 + c0]) * fx
+      const bottom = t[r1 + c0] + (t[r1 + c1] - t[r1 + c0]) * fx
+      const m = 1 + (top + (bottom - top) * fy) * amount
+      const i = (py * width + px) * 4
+      data[i] *= m
+      data[i + 1] *= m
+      data[i + 2] *= m
+    }
+  }
+  ctx.putImageData(image, 0, 0)
+}
+
 function grain(ctx: Ctx2D, scene: Scene, width: number, height: number, t: number) {
   if (scene.post.grain <= 0) return
   const [seed, seed2] = grainSeeds(scene, t)
@@ -121,5 +153,6 @@ function grain(ctx: Ctx2D, scene: Scene, width: number, height: number, t: numbe
 export function renderScene(ctx: Ctx2D, scene: Scene, { width, height, t = 0 }: { width: number; height: number; t?: number }) {
   drawLayers(ctx, scene.layers, { height, aspect: scene.aspect, t })
   vignette(ctx, scene, width, height)
+  paper(ctx, scene, width, height)
   grain(ctx, scene, width, height, t)
 }

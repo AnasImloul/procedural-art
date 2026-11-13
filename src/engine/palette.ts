@@ -4,6 +4,7 @@ import { ANCHOR_KEYS, MOOD_LIGHT, MOODS, type AnchorKey, type Anchors, type Mood
 import type { Rng } from './rng'
 
 const MID = 0.45
+const MUTE = { chroma: 0.78, contrast: 0.9, lift: 0.03 }
 
 export interface Atmosphere {
   gamma: number
@@ -25,9 +26,10 @@ export function makePalette(rng: Rng, mood: MoodId, atmosphere: Atmosphere, over
   for (const key of ANCHOR_KEYS) {
     const base = overrides?.[mood]?.[key] ?? MOODS[mood][key]
     const r = rng.fork(key)
+    const l = clamp(base.l + r.range(-0.03, 0.03), 0.04, 0.97)
     anchors[key] = {
-      l: clamp(base.l + r.range(-0.03, 0.03), 0.04, 0.97),
-      c: base.c * r.range(0.9, 1.1),
+      l: clamp(0.5 + (l - 0.5) * MUTE.contrast + MUTE.lift, 0.04, 0.97),
+      c: base.c * r.range(0.9, 1.1) * MUTE.chroma,
       h: (base.h + hueShift + 360) % 360,
       a: base.a,
     }

@@ -11,6 +11,18 @@ export const circle = (cx: number, cy: number, r: number) =>
 export const polygon = (points: Vec[]) =>
   points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${f(x)} ${f(y)}`).join('') + 'Z'
 
+export function wobblePath(d: string, move: (p: [number, number]) => [number, number]): string {
+  return d
+    .replace(/([ML])(-?[\d.]+) (-?[\d.]+)/g, (_, cmd: string, x: string, y: string) => {
+      const p = move([+x, +y])
+      return cmd + f(p[0]) + ' ' + f(p[1])
+    })
+    .replace(/A(-?[\d.]+) (-?[\d.]+) (\d) (\d) (\d) (-?[\d.]+) (-?[\d.]+)/g, (_, rx, ry, rot, large, sweep, x: string, y: string) => {
+      const p = move([+x, +y])
+      return `A${rx} ${ry} ${rot} ${large} ${sweep} ${f(p[0])} ${f(p[1])}`
+    })
+}
+
 export function mirrorPathY(d: string, axis: number): string {
   return d.replace(/([MLHVAZ])([^MLHVAZ]*)/g, (_, cmd: string, args: string) => {
     const n = args.trim() ? args.trim().split(/[\s,]+/).map(Number) : []

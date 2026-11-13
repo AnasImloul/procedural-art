@@ -3,6 +3,7 @@ import { cycleMoods, type MoodId } from './moods'
 import { blendPalettes, makePalette, type Atmosphere, type Palette, type PaletteOverrides } from './palette'
 import { assessComposition, type QualityRules } from './quality'
 import { Rng } from './rng'
+import { makeWobble, type Wobble } from './wobble'
 import { finalize, type Layer, type LoopMode, type ParamValue, type PostFx, type Scene } from './scene'
 
 export interface Env {
@@ -79,7 +80,7 @@ export interface GenerateOptions {
   overrides?: ParamOverrides
 }
 
-const DEFAULT_POST: PostFx = { grain: 0.035, vignette: 0.28, bloom: 0 }
+const DEFAULT_POST: PostFx = { grain: 0, paper: 1, vignette: 0.28, bloom: 0 }
 const DEFAULT_PAN = { seconds: 120, speed: 6 }
 const DEFAULT_CYCLE_SECONDS = 120
 
@@ -115,7 +116,11 @@ export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect,
   const panSpeed = cycle ? (pan.speed * cycleSeconds) / pan.seconds : pan.speed
   const seconds = cycle ? cycleSeconds : loop === 'pan' ? pan.seconds : (theme.loop?.seconds ?? 12)
 
-  let best: Scene | undefined
+  const build = (layers: Layer[], wobble?: Wobble) => {
+    const finished = finalize(layers, palette, theme.outline, wobble)
+    return cycle ? stillForCycle(finished) : finished
+  }
+  let best: { scene: Scene; layers: Layer[] } | undefined
   let bestScore = Infinity
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const layout = attempt === 0 ? root : root.fork(`attempt-${attempt}`)
@@ -136,16 +141,16 @@ export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect,
       palette,
       params,
       loop: { mode: loop, cycle, seconds },
-      layers: cycle ? stillForCycle(finalize(panned, palette, theme.outline)) : finalize(panned, palette, theme.outline),
+      layers: build(panned),
       post: { ...DEFAULT_POST, ...theme.post },
       attempt,
     }
     const { score } = assessComposition(scene, theme.quality)
     if (score < bestScore) {
-      best = scene
+      best = { scene, layers: panned }
       bestScore = score
     }
     if (score === 0) break
   }
-  return best!
+  return { ...best!.scene, layers: build(best!.layers, makeWobble(root.key, aspect)) }
 }

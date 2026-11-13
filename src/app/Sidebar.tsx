@@ -213,7 +213,7 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
         <button type="button" className="button" onClick={() => exportSvg('clean')} title="No filters or blend modes. Safe for Illustrator, Figma and plotters.">
           SVG clean
         </button>
-        <button type="button" className="button" onClick={() => exportSvg('styled')} title="Adds film grain as a tiled texture that scales with the artwork.">
+        <button type="button" className="button" onClick={() => exportSvg('styled')} title="Adds the paper texture as a tiled image that scales with the artwork.">
           SVG styled
         </button>
       </div>

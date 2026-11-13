@@ -1,6 +1,7 @@
 import type { Color } from './color'
 import type { Palette } from './palette'
-import { mirrorPathY } from './path'
+import { mirrorPathY, wobblePath } from './path'
+import type { Wobble } from './wobble'
 import { rimLight } from './rim'
 
 export type Vec = [number, number]
@@ -46,6 +47,7 @@ export type ParamValue = number | boolean
 
 export interface PostFx {
   grain: number
+  paper: number
   vignette: number
   bloom: number
 }
@@ -91,14 +93,18 @@ function reflect(layer: Layer, axis: number, clip: string): Layer {
   }
 }
 
-export function finalize(layers: Layer[], palette: Palette, outline: 'rim' | 'contour' | 'none'): Layer[] {
+export function finalize(layers: Layer[], palette: Palette, outline: 'rim' | 'contour' | 'none', wobble?: Wobble): Layer[] {
   const light = layers.find((l) => l.light)?.light
   const finished = [...layers]
     .sort((a, b) => b.depth - a.depth)
     .flatMap((layer) => {
       if (layer.role !== 'terrain' && layer.role !== 'prop') return [layer]
       const fill = solid(palette.atDepth(layer.depth))
-      const filled = { ...layer, shapes: layer.shapes.map((s) => (s.fill ? s : { ...s, fill })) }
+      const filled = {
+        ...layer,
+        edge: wobble && layer.edge ? layer.edge.map(wobble) : layer.edge,
+        shapes: layer.shapes.map((s) => ({ ...s, d: wobble ? wobblePath(s.d, wobble) : s.d, fill: s.fill ?? fill })),
+      }
       return outline === 'rim' && light && layer.rim && layer.edge ? [filled, rimLight(filled, palette, light)] : [filled]
     })
   return finished.flatMap((layer, i) =>
