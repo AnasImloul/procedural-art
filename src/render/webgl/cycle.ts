@@ -60,6 +60,7 @@ export const KEYFRAME_HOURS: number[] = DAY_CYCLE.slice(0, -1).flatMap(([h0, fro
   return Array.from({ length: n }, (_, s) => h0 + ((h1 - h0) * s) / n)
 })
 const KEYFRAMES = KEYFRAME_HOURS.length
+const PREVIEW_HEIGHT = 216
 const wrapHour = (hour: number) => ((hour % 24) + 24) % 24
 
 export interface CycleSource {
@@ -89,11 +90,11 @@ interface Keyframe {
 const rgb = (c: Color) => toRgb(c).map((v) => v / 255) as [number, number, number]
 
 export class CycleCompositor {
-  static create(canvas: HTMLCanvasElement, { preserveDrawingBuffer = false } = {}): CycleCompositor | null {
+  static create(canvas: HTMLCanvasElement, { preserveDrawingBuffer = false, previews = true } = {}): CycleCompositor | null {
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, premultipliedAlpha: true, preserveDrawingBuffer })
     if (!gl) return null
     try {
-      return new CycleCompositor(gl)
+      return new CycleCompositor(gl, previews)
     } catch (err) {
       console.error(err)
       return null
@@ -108,6 +109,8 @@ export class CycleCompositor {
   private fbo: WebGLFramebuffer | null = null
   private fboTexture: WebGLTexture | null = null
   private frames = new Map<number, Keyframe>()
+  private previews = new Map<number, Keyframe>()
+  private previewsStarted = false
   private pending = new Map<number, Promise<void>>()
   private wanted = new Set<number>()
   private source?: CycleSource
@@ -117,7 +120,10 @@ export class CycleCompositor {
   private width = 0
   private height = 0
 
-  private constructor(private readonly gl: WebGL2RenderingContext) {
+  private constructor(
+    private readonly gl: WebGL2RenderingContext,
+    private readonly usePreviews: boolean,
+  ) {
     this.crossfade = compile(gl, CROSSFADE)
     this.body = compile(gl, BODY)
     this.post = compile(gl, POST)
@@ -143,6 +149,10 @@ export class CycleCompositor {
     const k = this.index(hour)
     const next = (k + 1) % KEYFRAMES
     this.wanted = new Set([k, next, (k + 2) % KEYFRAMES])
+    if (this.usePreviews && !this.previewsStarted) {
+      this.previewsStarted = true
+      this.loadPreviews(k).catch((err) => console.error(err))
+    }
     void this.load((k + 2) % KEYFRAMES)
     await Promise.all([this.load(k), this.load(next)])
   }
@@ -151,8 +161,9 @@ export class CycleCompositor {
     const { gl, source } = this
     if (!source || !this.fbo) return false
     const k = this.index(hour)
-    const a = this.frames.get(k)
-    const b = this.frames.get((k + 1) % KEYFRAMES)
+    const next = (k + 1) % KEYFRAMES
+    const a = this.frames.get(k) ?? this.previews.get(k)
+    const b = this.frames.get(next) ?? this.previews.get(next)
     void this.prepare(hour)
     if (!a || !b) return false
     a.used = b.used = ++this.clock
@@ -197,6 +208,7 @@ export class CycleCompositor {
   }
 
   dispose() {
+    this.generation++
     this.release()
     const { gl } = this
     if (this.fboTexture) gl.deleteTexture(this.fboTexture)
@@ -231,6 +243,23 @@ export class CycleCompositor {
     })
     this.pending.set(k, promise)
     return promise
+  }
+
+  private async loadPreviews(from: number) {
+    const generation = this.generation
+    const expected = this.source!.runs.length
+    const height = Math.min(this.height, PREVIEW_HEIGHT)
+    const width = Math.max(1, Math.round((this.width * height) / this.height))
+    for (let i = 0; i < KEYFRAMES; i++) {
+      const k = (from + (i % 2 ? (i + 1) / 2 : KEYFRAMES - i / 2)) % KEYFRAMES
+      const [backdrop, ...runs] = await this.loader!(KEYFRAME_HOURS[k], width, height)
+      if (generation !== this.generation || runs.length !== expected) {
+        for (const part of [backdrop, ...runs]) part.bitmap.close()
+        if (generation !== this.generation) return
+        continue
+      }
+      this.previews.set(k, { backdrop: this.upload(backdrop, false), runs: runs.map((part) => this.upload(part, true)), used: 0 })
+    }
   }
 
   private evict() {
@@ -327,8 +356,10 @@ export class CycleCompositor {
   }
 
   private release() {
-    for (const f of this.frames.values()) this.deleteFrame(f)
+    for (const f of [...this.frames.values(), ...this.previews.values()]) this.deleteFrame(f)
     this.frames.clear()
+    this.previews.clear()
+    this.previewsStarted = false
     this.pending.clear()
   }
 }

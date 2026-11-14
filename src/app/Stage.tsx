@@ -50,6 +50,10 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
   const [pausedAt, setPausedAt] = useState(0)
   const [glActive, setGlActive] = useState(false)
   const [cycleActive, setCycleActive] = useState(false)
+  const [scrubbing, setScrubbingState] = useState(false)
+  const scrubbingRef = useRef(false)
+  const committingRef = useRef(false)
+  const commitTimer = useRef(0)
   const loopMs = scene.loop.seconds * 1000
   const isCycle = !!cycle
   const cycleKey = cycle?.source.key
@@ -73,6 +77,11 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
   }, [box, scene.aspect])
 
   const seconds = scene.loop.seconds
+  const setScrubbing = useCallback((value: boolean) => {
+    scrubbingRef.current = value
+    setScrubbingState(value)
+  }, [])
+
   const showTime = useCallback(
     (t: number) => {
       if (sliderRef.current) sliderRef.current.value = String(t)
@@ -95,6 +104,7 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
 
   useEffect(() => {
     if (!size || (playing && !(isCycle && !cycleActive))) return
+    if (!playing && scrubbingRef.current && !committingRef.current) return
     const canvas = canvasRef.current!
     canvas.width = size.width
     canvas.height = size.height
@@ -103,20 +113,34 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
     renderScene(canvas.getContext('2d')!, scene, { width: size.width, height: size.height, t })
     onRendered(performance.now() - started)
     if (!playing) showTime(isCycle ? (cycleRef.current!.hour % 24) / 24 : pausedAt)
-  }, [playing, scene, size, pausedAt, onRendered, isCycle, cycleActive, showTime])
+    if (committingRef.current) {
+      committingRef.current = false
+      setScrubbing(false)
+    }
+  }, [playing, scene, size, pausedAt, onRendered, isCycle, cycleActive, showTime, setScrubbing])
+
+  const startCycle = useCallback(() => {
+    const canvas = cycleCanvasRef.current!
+    if (cycleCompositorRef.current === undefined) cycleCompositorRef.current = CycleCompositor.create(canvas)
+    const compositor = cycleCompositorRef.current
+    if (!compositor || !size) return null
+    const { source, loader } = cycleRef.current!
+    const scale = source.runs.length > 3 ? Math.min(1, 1080 / size.height) : 1
+    const width = Math.round(size.width * scale)
+    const height = Math.round(size.height * scale)
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width
+      canvas.height = height
+    }
+    compositor.setSource(source, loader, width, height)
+    return compositor
+  }, [size])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: cycleKey restarts playback when the cycle source changes; the source itself is read through cycleRef so mood or hour changes don't restart it
   useEffect(() => {
     if (!playing || !size || !isCycle) return
-    const canvas = cycleCanvasRef.current!
-    if (cycleCompositorRef.current === undefined) cycleCompositorRef.current = CycleCompositor.create(canvas)
-    const compositor = cycleCompositorRef.current
+    const compositor = startCycle()
     if (!compositor) return
-    const { source, loader } = cycleRef.current!
-    const scale = source.runs.length > 3 ? Math.min(1, 1080 / size.height) : 1
-    canvas.width = Math.round(size.width * scale)
-    canvas.height = Math.round(size.height * scale)
-    compositor.setSource(source, loader, canvas.width, canvas.height)
     startRef.current = performance.now() - timeRef.current * loopMs
     let ready = false
     let frame = 0
@@ -127,10 +151,9 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
       const t = elapsed - Math.floor(elapsed)
       timeRef.current = t
       const started = performance.now()
-      const ok = compositor.render(t * 24, t)
-      if (ok !== ready) {
-        ready = ok
-        setCycleActive(ok)
+      if (compositor.render(t * 24, t) && !ready) {
+        ready = true
+        setCycleActive(true)
       }
       total += performance.now() - started
       if (++frames === 30) {
@@ -146,7 +169,23 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
       cancelAnimationFrame(frame)
       setCycleActive(false)
     }
-  }, [playing, size, isCycle, cycleKey, loopMs, onRendered, showTime])
+  }, [playing, size, isCycle, cycleKey, loopMs, onRendered, showTime, startCycle])
+
+  useEffect(() => {
+    if (playing || !scrubbing || !isCycle) return
+    const compositor = startCycle()
+    if (!compositor) return
+    let frame = 0
+    const tick = () => {
+      const t = timeRef.current
+      if (compositor.render(t * 24, t)) setCycleActive(true)
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [playing, scrubbing, isCycle, startCycle])
+
+  useEffect(() => () => clearTimeout(commitTimer.current), [])
 
   useEffect(() => {
     if (!playing || !size || isCycle) return
@@ -190,6 +229,9 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
   }, [playing, scene, size, loopMs, onRendered, isCycle, showTime])
 
   const toggle = () => {
+    clearTimeout(commitTimer.current)
+    committingRef.current = false
+    setScrubbing(false)
     if (playing) {
       if (isCycle) cycleRef.current!.onHour(timeRef.current * 24)
       else setPausedAt(timeRef.current)
@@ -207,19 +249,36 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  const commitHour = (t: number) => {
+    const cycleProps = cycleRef.current!
+    if (Math.round(t * 2400) / 100 === cycleProps.hour) {
+      setScrubbing(false)
+      return
+    }
+    committingRef.current = true
+    cycleProps.onHour(t * 24)
+  }
+
   const scrub = (t: number) => {
     timeRef.current = t
     if (playing) startRef.current = performance.now() - t * loopMs
-    else if (isCycle) cycleRef.current!.onHour(t * 24)
-    else setPausedAt(t)
+    else if (isCycle) {
+      committingRef.current = false
+      setScrubbing(true)
+      showTime(t)
+      clearTimeout(commitTimer.current)
+      commitTimer.current = window.setTimeout(() => commitHour(t), 200)
+    } else setPausedAt(t)
   }
+
+  const cycleVisible = isCycle && cycleActive && (playing || scrubbing)
 
   return (
     <div className="stage-view">
       <div className="stage-canvas" ref={wrapRef}>
-        <canvas ref={canvasRef} hidden={playing && (isCycle ? cycleActive : glActive)} />
+        <canvas ref={canvasRef} hidden={isCycle ? cycleVisible : playing && glActive} />
         <canvas ref={glCanvasRef} hidden={!(playing && !isCycle && glActive)} />
-        <canvas ref={cycleCanvasRef} hidden={!(playing && isCycle && cycleActive)} />
+        <canvas ref={cycleCanvasRef} hidden={!cycleVisible} />
       </div>
       <div className="transport">
         <button type="button" className="icon-button" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause (P)' : 'Play (P)'}>
