@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Procedural Landscapes</title>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7fa3bb" />
+      <stop offset="0.7" stop-color="#efc189" />
+    </linearGradient>
+    <clipPath id="tile">
+      <rect width="64" height="64" rx="14" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="64" height="64" fill="url(#sky)" />
+    <circle cx="22" cy="29" r="8" fill="#fbecc9" />
+    <path d="M0 40 14 30 22 35 36 21 48 32 56 27 64 31V64H0Z" fill="#c4876a" />
+    <path d="M0 48 12 41 24 46 38 36 50 44 64 38V64H0Z" fill="#8c4f45" />
+    <path d="M0 56 16 50 30 55 44 48 64 54V64H0Z" fill="#4e2c33" />
+  </g>
+</svg>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Scene } from '../engine/scene'
 import { renderScene } from '../render/canvas'
 import { Compositor } from '../render/webgl/compositor'
@@ -15,6 +15,8 @@ interface StageProps {
   scene: Scene
   cycle?: CycleProps
   onRendered(ms: number): void
+  header?: ReactNode
+  children?: ReactNode
 }
 
 export const clock = (hour: number) => {
@@ -32,7 +34,7 @@ function PlayIcon({ playing }: { playing: boolean }) {
   )
 }
 
-export function Stage({ scene, cycle, onRendered }: StageProps) {
+export function Stage({ scene, cycle, onRendered, header, children }: StageProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -46,6 +48,7 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
   const timeRef = useRef(0)
   const startRef = useRef(0)
   const [box, setBox] = useState({ width: 0, height: 0 })
+  const [settledBox, setSettledBox] = useState(box)
   const [playing, setPlaying] = useState(() => !prefersReducedMotion())
   const [pausedAt, setPausedAt] = useState(0)
   const [glActive, setGlActive] = useState(false)
@@ -68,13 +71,25 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
     }
   }, [])
 
+  useEffect(() => {
+    setSettledBox((current) => (current.width && current.height ? current : box))
+    const id = setTimeout(() => setSettledBox(box), 150)
+    return () => clearTimeout(id)
+  }, [box])
+
+  const fitBox = (area: { width: number; height: number }) => {
+    if (!area.width || !area.height) return null
+    const cssHeight = Math.min(area.height, area.width / scene.aspect)
+    return { cssWidth: cssHeight * scene.aspect, cssHeight }
+  }
+  const display = fitBox(box)
+
   const size = useMemo(() => {
-    if (!box.width || !box.height) return null
-    const cssHeight = Math.min(box.height, box.width / scene.aspect)
-    const cssWidth = cssHeight * scene.aspect
+    const css = settledBox.width && settledBox.height ? Math.min(settledBox.height, settledBox.width / scene.aspect) : 0
+    if (!css) return null
     const dpr = window.devicePixelRatio || 1
-    return { cssWidth, cssHeight, width: Math.round(cssWidth * dpr), height: Math.round(cssHeight * dpr) }
-  }, [box, scene.aspect])
+    return { width: Math.round(css * scene.aspect * dpr), height: Math.round(css * dpr) }
+  }, [settledBox, scene.aspect])
 
   const seconds = scene.loop.seconds
   const setScrubbing = useCallback((value: boolean) => {
@@ -84,19 +99,24 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
 
   const showTime = useCallback(
     (t: number) => {
-      if (sliderRef.current) sliderRef.current.value = String(t)
+      if (sliderRef.current) {
+        sliderRef.current.value = String(t)
+        sliderRef.current.style.setProperty('--p', String(t))
+      }
       if (labelRef.current) labelRef.current.textContent = isCycle ? clock(t * 24) : `${(t * seconds).toFixed(1)} / ${seconds} s`
     },
     [isCycle, seconds],
   )
 
+  const cssWidth = display?.cssWidth
+  const cssHeight = display?.cssHeight
   useEffect(() => {
-    if (!size) return
+    if (!cssWidth || !cssHeight) return
     for (const canvas of [canvasRef.current!, glCanvasRef.current!, cycleCanvasRef.current!]) {
-      canvas.style.width = `${size.cssWidth}px`
-      canvas.style.height = `${size.cssHeight}px`
+      canvas.style.width = `${cssWidth}px`
+      canvas.style.height = `${cssHeight}px`
     }
-  }, [size])
+  }, [cssWidth, cssHeight])
 
   useEffect(() => {
     if (isCycle) timeRef.current = (cycleRef.current!.hour % 24) / 24
@@ -275,26 +295,32 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
 
   return (
     <div className="stage-view">
+      <div className="stage-header" style={{ width: cssWidth }}>
+        {header}
+      </div>
       <div className="stage-canvas" ref={wrapRef}>
         <canvas ref={canvasRef} hidden={isCycle ? cycleVisible : playing && glActive} />
         <canvas ref={glCanvasRef} hidden={!(playing && !isCycle && glActive)} />
         <canvas ref={cycleCanvasRef} hidden={!cycleVisible} />
       </div>
-      <div className="transport">
-        <button type="button" className="icon-button" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause (P)' : 'Play (P)'}>
-          <PlayIcon playing={playing} />
-        </button>
-        <input
-          ref={sliderRef}
-          type="range"
-          min={0}
-          max={1}
-          step={0.0005}
-          defaultValue={0}
-          aria-label={isCycle ? 'Time of day' : 'Time'}
-          onChange={(e) => scrub(Number(e.target.value))}
-        />
-        <span ref={labelRef} className="transport-time" />
+      <div className="stage-footer" style={{ width: cssWidth }}>
+        <div className="transport">
+          <button type="button" className="icon-button" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause (P)' : 'Play (P)'}>
+            <PlayIcon playing={playing} />
+          </button>
+          <input
+            ref={sliderRef}
+            type="range"
+            min={0}
+            max={1}
+            step={0.0005}
+            defaultValue={0}
+            aria-label={isCycle ? 'Time of day' : 'Time'}
+            onChange={(e) => scrub(Number(e.target.value))}
+          />
+          <span ref={labelRef} className="transport-time" />
+        </div>
+        {children}
       </div>
     </div>
   )

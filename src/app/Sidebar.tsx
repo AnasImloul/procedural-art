@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { MOOD_IDS, type MoodId } from '../engine/moods'
 import type { AspectId, LoopMode, Scene } from '../engine/scene'
 import type { ParamOverrides, Theme } from '../engine/theme'
@@ -11,6 +11,7 @@ import { ASPECT_IDS, DEFAULT_HOUR, EXPORT_PRESETS, VIDEO_PRESETS, type ViewState
 import { Thumb } from './Thumb'
 
 interface SidebarProps {
+  collapsed: boolean
   state: ViewState
   theme: Theme
   scene: Scene
@@ -23,7 +24,18 @@ interface SidebarProps {
   forward(): void
 }
 
-function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+function Section({ title, action, collapsible, children }: { title: string; action?: ReactNode; collapsible?: boolean; children: ReactNode }) {
+  if (collapsible) {
+    return (
+      <details className="section">
+        <summary className="section-header">
+          <h2>{title}</h2>
+          {action}
+        </summary>
+        {children}
+      </details>
+    )
+  }
   return (
     <section className="section">
       <header className="section-header">
@@ -93,6 +105,7 @@ function Params({ theme, scene, overrides, onChange }: { theme: Theme; scene: Sc
                 max={spec.max}
                 step={spec.kind === 'int' ? 1 : (spec.max - spec.min) / 200}
                 value={value as number}
+                style={{ '--p': ((value as number) - spec.min) / (spec.max - spec.min) } as CSSProperties}
                 onChange={(e) => onChange({ ...overrides, [key]: Number(e.target.value) })}
               />
             )}
@@ -234,102 +247,113 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
   )
 }
 
-export function Sidebar({ state, theme, scene, canGoBack, canGoForward, update, goToSeed, newSeed, back, forward }: SidebarProps) {
+export function Sidebar({ collapsed, state, theme, scene, canGoBack, canGoForward, update, goToSeed, newSeed, back, forward }: SidebarProps) {
   const locked = Object.keys(state.overrides).length
   return (
-    <aside className="sidebar">
-      <header className="brand">
-        <h1>Procedural Landscapes</h1>
-      </header>
+    <aside className="sidebar" inert={collapsed}>
+      <div className="sidebar-inner">
+        <header className="brand">
+          <h1>Procedural Landscapes</h1>
+          <p>Seeded landscapes, drawn by code</p>
+        </header>
 
-      <Section title="Theme">
-        <div className="theme-grid">
-          {THEMES.map((t) => (
-            <Thumb
-              key={t.id}
-              label={t.name}
-              active={t.id === state.theme}
-              job={{
-                theme: t.id,
-                seed: state.seed,
-                aspect: '16:9',
-                mood: state.mood,
-                loop: state.loop,
-                cycle: state.cycle,
-                hour: state.hour,
-                overrides: {},
-                width: 320,
-                height: 180,
-              }}
-              onSelect={() => update({ theme: t.id, version: undefined })}
-            />
-          ))}
-        </div>
-      </Section>
+        <Section title="Theme">
+          <div className="theme-grid">
+            {THEMES.map((t) => (
+              <Thumb
+                key={t.id}
+                label={t.name}
+                active={t.id === state.theme}
+                job={{
+                  theme: t.id,
+                  seed: state.seed,
+                  aspect: '16:9',
+                  mood: state.mood,
+                  loop: state.loop,
+                  cycle: state.cycle,
+                  hour: state.hour,
+                  overrides: {},
+                  width: 320,
+                  height: 180,
+                }}
+                onSelect={() => update({ theme: t.id, version: undefined })}
+              />
+            ))}
+          </div>
+        </Section>
 
-      <Section title="Seed">
-        <div className="seed-row">
-          <button type="button" className="icon-button" onClick={back} disabled={!canGoBack} aria-label="Previous seed" title="Previous seed (←)">
-            ‹
-          </button>
-          <SeedField seed={state.seed} onCommit={goToSeed} />
-          <button type="button" className="icon-button" onClick={forward} disabled={!canGoForward} aria-label="Next seed" title="Next seed (→)">
-            ›
-          </button>
-        </div>
-        <button type="button" className="button button-primary" onClick={newSeed}>
-          New seed <kbd>Space</kbd>
-        </button>
-      </Section>
-
-      <Section title="Mood">
-        <Chips<'auto' | MoodId>
-          items={['auto', ...MOOD_IDS]}
-          value={state.mood ?? 'auto'}
-          label={(m) => (m === 'auto' && !state.mood ? `auto · ${scene.palette.mood}` : m)}
-          onChange={(m) => update({ mood: m === 'auto' ? undefined : m })}
-        />
-      </Section>
-
-      <Section title="Aspect">
-        <Chips<AspectId> items={ASPECT_IDS} value={state.aspect} onChange={(aspect) => update({ aspect })} />
-      </Section>
-
-      <Section title="Motion">
-        <div className="motion-rows">
-          <span className="motion-label">Camera</span>
-          <Chips<LoopMode>
-            items={['ambient', 'pan']}
-            value={state.loop ?? 'ambient'}
-            label={(loop) => (loop === 'ambient' ? 'still' : loop)}
-            onChange={(loop) => update({ loop: loop === 'pan' ? 'pan' : undefined })}
-          />
-          <span className="motion-label">Time</span>
-          <Chips<'fixed' | 'cycle'>
-            items={['fixed', 'cycle']}
-            value={state.cycle ? 'cycle' : 'fixed'}
-            label={(time) => (time === 'cycle' ? 'day cycle' : time)}
-            onChange={(time) => update({ cycle: time === 'cycle' ? true : undefined, hour: time === 'cycle' ? (state.hour ?? DEFAULT_HOUR) : state.hour })}
-          />
-        </div>
-      </Section>
-
-      <Section
-        title="Parameters"
-        action={
-          locked > 0 && (
-            <button type="button" className="text-button" onClick={() => update({ overrides: {} })}>
-              Unlock {locked}
+        <Section title="Seed">
+          <div className="seed-row">
+            <button type="button" className="icon-button" onClick={back} disabled={!canGoBack} aria-label="Previous seed" title="Previous seed (←)">
+              ‹
             </button>
-          )
-        }
-      >
-        <Params theme={theme} scene={scene} overrides={state.overrides} onChange={(overrides) => update({ overrides })} />
-      </Section>
+            <SeedField seed={state.seed} onCommit={goToSeed} />
+            <button type="button" className="icon-button" onClick={forward} disabled={!canGoForward} aria-label="Next seed" title="Next seed (→)">
+              ›
+            </button>
+          </div>
+          <button type="button" className="button button-primary" onClick={newSeed}>
+            New seed <kbd>Space</kbd>
+          </button>
+        </Section>
 
-      <Section title="Export">
-        <ExportPanel state={state} theme={theme} scene={scene} />
-      </Section>
+        <Section title="Mood">
+          <Chips<'auto' | MoodId>
+            items={['auto', ...MOOD_IDS]}
+            value={state.mood ?? 'auto'}
+            label={(m) => (m === 'auto' && !state.mood ? `auto · ${scene.palette.mood}` : m)}
+            onChange={(m) => update({ mood: m === 'auto' ? undefined : m })}
+          />
+        </Section>
+
+        <Section title="Aspect">
+          <Chips<AspectId> items={ASPECT_IDS} value={state.aspect} onChange={(aspect) => update({ aspect })} />
+        </Section>
+
+        <Section title="Motion">
+          <div className="motion-rows">
+            <span className="motion-label">Camera</span>
+            <Chips<LoopMode>
+              items={['ambient', 'pan']}
+              value={state.loop ?? 'ambient'}
+              label={(loop) => (loop === 'ambient' ? 'still' : loop)}
+              onChange={(loop) => update({ loop: loop === 'pan' ? 'pan' : undefined })}
+            />
+            <span className="motion-label">Time</span>
+            <Chips<'fixed' | 'cycle'>
+              items={['fixed', 'cycle']}
+              value={state.cycle ? 'cycle' : 'fixed'}
+              label={(time) => (time === 'cycle' ? 'day cycle' : time)}
+              onChange={(time) => update({ cycle: time === 'cycle' ? true : undefined, hour: time === 'cycle' ? (state.hour ?? DEFAULT_HOUR) : state.hour })}
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="Parameters"
+          collapsible
+          action={
+            locked > 0 && (
+              <button
+                type="button"
+                className="text-button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  update({ overrides: {} })
+                }}
+              >
+                Unlock {locked}
+              </button>
+            )
+          }
+        >
+          <Params theme={theme} scene={scene} overrides={state.overrides} onChange={(overrides) => update({ overrides })} />
+        </Section>
+
+        <Section title="Export">
+          <ExportPanel state={state} theme={theme} scene={scene} />
+        </Section>
+      </div>
     </aside>
   )
 }
