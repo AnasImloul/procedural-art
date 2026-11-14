@@ -9,13 +9,13 @@ export const circle = (cx: number, cy: number, r: number) =>
   `M${f(cx - r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 0 ${f(cx + r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 0 ${f(cx - r)} ${f(cy)}Z`
 
 export const polygon = (points: Vec[]) =>
-  points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${f(x)} ${f(y)}`).join('') + 'Z'
+  `${points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${f(x)} ${f(y)}`).join('')}Z`
 
 export function wobblePath(d: string, move: (p: [number, number]) => [number, number]): string {
   return d
     .replace(/([ML])(-?[\d.]+) (-?[\d.]+)/g, (_, cmd: string, x: string, y: string) => {
       const p = move([+x, +y])
-      return cmd + f(p[0]) + ' ' + f(p[1])
+      return `${cmd}${f(p[0])} ${f(p[1])}`
     })
     .replace(/A(-?[\d.]+) (-?[\d.]+) (\d) (\d) (\d) (-?[\d.]+) (-?[\d.]+)/g, (_, rx, ry, rot, large, sweep, x: string, y: string) => {
       const p = move([+x, +y])

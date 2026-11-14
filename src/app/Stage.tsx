@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Scene } from '../engine/scene'
 import { renderScene } from '../render/canvas'
 import { Compositor } from '../render/webgl/compositor'
@@ -78,10 +78,14 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
     return { cssWidth, cssHeight, width: Math.round(cssWidth * dpr), height: Math.round(cssHeight * dpr) }
   }, [box, scene.aspect])
 
-  const showTime = (t: number) => {
-    if (sliderRef.current) sliderRef.current.value = String(t)
-    if (labelRef.current) labelRef.current.textContent = isCycle ? clock(t * 24) : `${(t * scene.loop.seconds).toFixed(1)} / ${scene.loop.seconds} s`
-  }
+  const seconds = scene.loop.seconds
+  const showTime = useCallback(
+    (t: number) => {
+      if (sliderRef.current) sliderRef.current.value = String(t)
+      if (labelRef.current) labelRef.current.textContent = isCycle ? clock(t * 24) : `${(t * seconds).toFixed(1)} / ${seconds} s`
+    },
+    [isCycle, seconds],
+  )
 
   useEffect(() => {
     if (!size) return
@@ -105,7 +109,7 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
     renderScene(canvas.getContext('2d')!, scene, { width: size.width, height: size.height, t })
     onRendered(performance.now() - started)
     if (!playing) showTime(isCycle ? (cycleRef.current!.hour % 24) / 24 : pausedAt)
-  }, [playing, scene, size, pausedAt, onRendered, isCycle, cycleActive])
+  }, [playing, scene, size, pausedAt, onRendered, isCycle, cycleActive, showTime])
 
   useEffect(() => {
     if (!playing || !size || !isCycle) return
@@ -147,7 +151,7 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
       cancelAnimationFrame(frame)
       setCycleActive(false)
     }
-  }, [playing, size, isCycle, cycleKey, loopMs, onRendered])
+  }, [playing, size, isCycle, cycleKey, loopMs, onRendered, showTime])
 
   useEffect(() => {
     if (!playing || !size || isCycle) return
@@ -188,7 +192,7 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [playing, scene, size, loopMs, onRendered, isCycle])
+  }, [playing, scene, size, loopMs, onRendered, isCycle, showTime])
 
   const toggle = () => {
     if (playing) {

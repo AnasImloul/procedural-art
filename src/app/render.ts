@@ -11,7 +11,7 @@ export function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value)
   const key = JSON.stringify(value)
   useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), ms)
+    const id = setTimeout(() => setDebounced(JSON.parse(key)), ms)
     return () => clearTimeout(id)
   }, [key, ms])
   return debounced
@@ -22,7 +22,7 @@ export function useRenderedImage(job: RenderJob, pool: RenderPool): string | und
   const key = JSON.stringify(job)
 
   useEffect(() => {
-    const handle = pool.render(job)
+    const handle = pool.render(JSON.parse(key))
     let alive = true
     handle.promise
       .then((blob) => alive && setUrl(URL.createObjectURL(blob)))

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { MOOD_IDS, type MoodId } from '../engine/moods'
 import type { AspectId, LoopMode, Scene } from '../engine/scene'
 import type { ParamOverrides, Theme } from '../engine/theme'
@@ -46,19 +46,14 @@ function Chips<T extends string>({
   label?: (item: T) => string
   onChange(item: T): void
 }) {
+  const name = useId()
   return (
     <div className="chips" role="radiogroup">
       {items.map((item) => (
-        <button
-          key={item}
-          type="button"
-          role="radio"
-          aria-checked={item === value}
-          className={`chip${item === value ? ' is-active' : ''}`}
-          onClick={() => onChange(item)}
-        >
+        <label key={item} className={`chip${item === value ? ' is-active' : ''}`}>
+          <input type="radio" name={name} value={item} checked={item === value} onChange={() => onChange(item)} />
           {label ? label(item) : item}
-        </button>
+        </label>
       ))}
     </div>
   )

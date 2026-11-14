@@ -88,7 +88,8 @@ export function App() {
 
   const stale = state.version !== undefined && state.version !== theme.version
   const source = useMemo(() => (state.cycle ? cycleSource(theme, state, scene) : undefined), [theme, state, scene])
-  const loader = useMemo(() => cycleLoader(state), [state.theme, state.seed, state.aspect, state.loop, state.overrides])
+  const { theme: themeId, seed, aspect, loop, overrides } = state
+  const loader = useMemo(() => cycleLoader({ theme: themeId, seed, aspect, loop, overrides }), [themeId, seed, aspect, loop, overrides])
   const onHour = useCallback((hour: number) => update({ hour: Math.round(hour * 100) / 100 }), [update])
   const cycleProps: CycleProps | undefined = source && { source, loader, hour: state.hour ?? DEFAULT_HOUR, onHour }
   const stripHeight = 176

@@ -21,7 +21,7 @@ export function cycleSource(theme: Theme, state: ViewState, scene: Scene): Cycle
 }
 
 export const cycleLoader =
-  (state: ViewState): KeyframeLoader =>
+  (state: Pick<ViewState, 'theme' | 'seed' | 'aspect' | 'loop' | 'overrides'>): KeyframeLoader =>
   (hour, width, height) =>
     cyclePool.keyframe({ theme: state.theme, seed: state.seed, aspect: state.aspect, loop: state.loop, cycle: true, overrides: state.overrides, hour, width, height, keyframe: true })
       .promise
