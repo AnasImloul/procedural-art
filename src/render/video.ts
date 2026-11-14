@@ -7,6 +7,7 @@ export interface VideoOptions {
   width: number
   height: number
   fps?: number
+  compatible?: boolean
   signal?: AbortSignal
   onProgress?(progress: number): void
 }
@@ -19,14 +20,14 @@ export interface VideoResult {
 
 async function encode(
   canvas: HTMLCanvasElement,
-  { width, height, fps = 30, signal, onProgress }: VideoOptions,
+  { width, height, fps = 30, compatible, signal, onProgress }: VideoOptions,
   frames: number,
   draw: (frame: number) => void | Promise<void>,
 ): Promise<VideoResult> {
   const quality = new Quality({ bitrate: Math.round(width * height * fps * 0.26) })
   const probe = { width, height, frameRate: fps, quality }
   let format: Mp4OutputFormat | WebMOutputFormat = new Mp4OutputFormat()
-  let codec = await getFirstEncodableVideoCodec(['avc'], probe)
+  let codec = await getFirstEncodableVideoCodec(compatible ? ['avc'] : ['hevc', 'avc'], probe)
   if (!codec) {
     format = new WebMOutputFormat()
     codec = await getFirstEncodableVideoCodec(['vp9', 'vp8'], probe)

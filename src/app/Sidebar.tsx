@@ -146,6 +146,7 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
   const [busy, setBusy] = useState<string | null>(null)
   const [video, setVideo] = useState<{ label: string; progress: number } | null>(null)
   const [message, setMessage] = useState<string>()
+  const [compatible, setCompatible] = useState(false)
   const videoAbort = useRef<AbortController | null>(null)
   const baseName = `${theme.id}-v${theme.version}-${state.seed}-${scene.palette.mood}`
 
@@ -173,7 +174,7 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
     setVideo({ label, progress: 0 })
     setMessage(undefined)
     try {
-      const options = { width, height, signal: controller.signal, onProgress: (progress: number) => setVideo({ label, progress }) }
+      const options = { width, height, compatible, signal: controller.signal, onProgress: (progress: number) => setVideo({ label, progress }) }
       const source = scene.loop.cycle ? cycleSource(theme, state, scene) : undefined
       const result = source
         ? await exportCycleVideo(source, cycleLoader(state), { ...options, startHour: state.hour ?? DEFAULT_HOUR })
@@ -224,6 +225,10 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
           </button>
         ))}
       </div>
+      <label className="check" title="HEVC looks better and plays in Safari, QuickTime and Chrome. H.264 plays everywhere.">
+        <input type="checkbox" checked={compatible} disabled={video !== null} onChange={(e) => setCompatible(e.target.checked)} />
+        H.264 for older players
+      </label>
       {video && (
         <div className="progress" role="status">
           <div className="progress-bar">
