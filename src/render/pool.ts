@@ -1,4 +1,4 @@
-import { renderKeyframe, renderToBlob, type KeyframeJob, type KeyframePart, type RenderJob } from './jobs'
+import { type KeyframeJob, type KeyframePart, type RenderJob, renderKeyframe, renderToBlob } from './jobs'
 
 type WorkerMessage = { ready: boolean } | { result: Blob | KeyframePart[] } | { error: string }
 

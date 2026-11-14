@@ -1,4 +1,3 @@
-
 export const GRAIN_REFERENCE_HEIGHT = 1080
 export const GRAIN_FPS = 24
 

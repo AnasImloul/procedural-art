@@ -1,4 +1,4 @@
-import { toRgb, withAlpha, type Color } from '../engine/color'
+import { type Color, toRgb, withAlpha } from '../engine/color'
 import { motionAt } from '../engine/motion'
 import type { Paint, Scene, Shape } from '../engine/scene'
 import { cellNoise, GRAIN_REFERENCE_HEIGHT, grainSeeds } from './grain'
@@ -7,7 +7,10 @@ import { PAPER_TILE, paperTile } from './paper'
 export type SvgMode = 'clean' | 'styled'
 
 const f = (n: number) => String(Math.round(n * 1e4) / 1e4)
-const hex = (color: Color) => `#${toRgb(color).map((v) => v.toString(16).padStart(2, '0')).join('')}`
+const hex = (color: Color) =>
+  `#${toRgb(color)
+    .map((v) => v.toString(16).padStart(2, '0'))
+    .join('')}`
 const alpha = (color: Color) => +(color.a ?? 1).toFixed(4)
 const escapeId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, '-')
 
@@ -53,12 +56,7 @@ function shapeMarkup(defs: Defs, shape: Shape, mode: SvgMode): string {
   if (!shape.d) return ''
   const attrs = [shape.fill ? paintAttrs(defs, shape.fill, 'fill') : 'fill="none"']
   if (shape.stroke) {
-    attrs.push(
-      paintAttrs(defs, shape.stroke.paint, 'stroke'),
-      `stroke-width="${f(shape.stroke.width)}"`,
-      'stroke-linejoin="round"',
-      'stroke-linecap="round"',
-    )
+    attrs.push(paintAttrs(defs, shape.stroke.paint, 'stroke'), `stroke-width="${f(shape.stroke.width)}"`, 'stroke-linejoin="round"', 'stroke-linecap="round"')
   }
   if (shape.opacity !== undefined && shape.opacity < 1) attrs.push(`opacity="${f(shape.opacity)}"`)
   if (mode === 'styled' && shape.blend && shape.blend !== 'normal') attrs.push(`style="mix-blend-mode:${shape.blend}"`)

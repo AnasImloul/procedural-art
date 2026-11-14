@@ -1,4 +1,4 @@
-import { mix, withAlpha, type Color } from '../color'
+import { type Color, mix, withAlpha } from '../color'
 import { sampleEdge } from '../geometry'
 import { clamp, lerp } from '../math'
 import { polygon } from '../path'

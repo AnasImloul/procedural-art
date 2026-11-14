@@ -47,7 +47,10 @@ export function sandWisps(env: Env, rng: Rng, { on, wind, strength, length }: Sa
       for (const offset of [0, -period, period]) {
         const xs = outline.map(([px]) => px + offset)
         if (offset !== 0 && (Math.max(...xs) < 0 || Math.min(...xs) > period)) continue
-        shapes.push({ d: polygon(outline.map(([px, py]) => [px + offset, py])), fill: { ...fill, from: [start[0] + offset, start[1]], to: [end[0] + offset, end[1]] } })
+        shapes.push({
+          d: polygon(outline.map(([px, py]) => [px + offset, py])),
+          fill: { ...fill, from: [start[0] + offset, start[1]], to: [end[0] + offset, end[1]] },
+        })
       }
     }
   }

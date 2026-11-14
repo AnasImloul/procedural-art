@@ -1,7 +1,7 @@
-import { oklch, withAlpha, type Color } from '../color'
+import { type Color, oklch, withAlpha } from '../color'
 import type { Celestial } from '../compose'
 import { circle } from '../path'
-import { solid, type Layer, type Shape } from '../scene'
+import { type Layer, type Shape, solid } from '../scene'
 import type { Env } from '../theme'
 
 export interface SunOptions {

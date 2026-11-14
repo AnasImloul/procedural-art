@@ -1,9 +1,9 @@
-import { lerp, smoothstep } from '@/engine/math'
-import { mix, oklch } from '@/engine/color'
-import { sampleEdge } from '@/engine/geometry'
-import { birds, cloudscape, deadTree, dunes, fogBand, lightShafts, mesas, sandWisps, scrub, sky, stars, sun, sunHaze } from '@/engine/primitives'
-import { solid, type Layer, type Vec } from '@/engine/scene'
-import { defineTheme, param } from '@/engine/theme'
+import { mix, oklch } from '../engine/color'
+import { sampleEdge } from '../engine/geometry'
+import { lerp, smoothstep } from '../engine/math'
+import { birds, cloudscape, deadTree, dunes, fogBand, lightShafts, mesas, sandWisps, scrub, sky, stars, sun, sunHaze } from '../engine/primitives'
+import { type Layer, solid, type Vec } from '../engine/scene'
+import { defineTheme, param } from '../engine/theme'
 
 export default defineTheme({
   id: 'dunes',
@@ -109,9 +109,7 @@ export default defineTheme({
       behind = d.edge
       const near = i === depths.length - 1
       if (i >= depths.length - 2) {
-        layers.push(
-          sandWisps(env, rng.fork(`wisps-${i}`), { on: d, wind, strength: 0.5 * p.wind, length: lerp(0.07, 0.16, 1 - depth) }),
-        )
+        layers.push(sandWisps(env, rng.fork(`wisps-${i}`), { on: d, wind, strength: 0.5 * p.wind, length: lerp(0.07, 0.16, 1 - depth) }))
       }
       if (near) {
         layers.push(scrub(env, rng.fork('scrub'), { on: d, size: [0.03, 0.065], density: p.scrub, lean: wind * 0.35 }))

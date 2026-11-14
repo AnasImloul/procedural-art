@@ -27,7 +27,11 @@ interface Knot {
   crest: boolean
 }
 
-export function dunes(env: Env, rng: Rng, { depth, baseline, amplitude, spacing, wind, shade = 0.22, rim, behind, peak, peakBoost = 0.3, dips = [] }: DunesOptions): Layer {
+export function dunes(
+  env: Env,
+  rng: Rng,
+  { depth, baseline, amplitude, spacing, wind, shade = 0.22, rim, behind, peak, peakBoost = 0.3, dips = [] }: DunesOptions,
+): Layer {
   const period = env.aspect
   const count = Math.max(1, Math.round(period / spacing))
   const weights = Array.from({ length: count }, () => rng.range(0.6, 1.5))

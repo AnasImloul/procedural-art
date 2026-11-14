@@ -1,4 +1,4 @@
-import { oklch, type Color } from './color'
+import { type Color, oklch } from './color'
 
 export const ANCHOR_KEYS = ['skyTop', 'skyHorizon', 'sun', 'haze', 'mid', 'ink', 'light', 'accent'] as const
 export type AnchorKey = (typeof ANCHOR_KEYS)[number]

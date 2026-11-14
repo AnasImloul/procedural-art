@@ -1,7 +1,7 @@
 import { MOOD_IDS, type MoodId } from '../engine/moods'
 import { ASPECTS, type AspectId, type LoopMode } from '../engine/scene'
 import type { ParamOverrides } from '../engine/theme'
-import { THEMES, findTheme } from '../themes'
+import { findTheme, THEMES } from '../themes'
 
 export interface ViewState {
   theme: string
@@ -60,7 +60,9 @@ export const VIDEO_PRESETS: Record<AspectId, { label: string; width: number; hei
 
 export const randomSeed = () => {
   const bytes = crypto.getRandomValues(new Uint8Array(5))
-  return Array.from(bytes, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 8)
+  return Array.from(bytes, (b) => b.toString(36).padStart(2, '0'))
+    .join('')
+    .slice(0, 8)
 }
 
 export function readHash(hash: string): ViewState {
@@ -79,7 +81,7 @@ export function readHash(hash: string): ViewState {
     mood: mood && MOOD_IDS.includes(mood) ? mood : undefined,
     loop: q.get('loop') === 'pan' ? 'pan' : undefined,
     cycle: q.get('cycle') === '1' || q.get('loop') === 'cycle' ? true : undefined,
-    hour: q.has('h') ? (((Number(q.get('h')) % 24) + 24) % 24 || 0) : undefined,
+    hour: q.has('h') ? ((Number(q.get('h')) % 24) + 24) % 24 || 0 : undefined,
     version: q.has('v') ? Number(q.get('v')) : undefined,
     overrides,
   }

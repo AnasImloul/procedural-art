@@ -16,7 +16,11 @@ export interface QualityReport {
 const DEFAULT_RULES: Required<QualityRules> = { skyline: [0.22, 0.5], sunVisible: 0.45, layerVisible: 0.2 }
 
 export function assessComposition(scene: Scene, rules: QualityRules = {}): QualityReport {
-  const { skyline: [top, bottom], sunVisible, layerVisible } = { ...DEFAULT_RULES, ...rules }
+  const {
+    skyline: [top, bottom],
+    sunVisible,
+    layerVisible,
+  } = { ...DEFAULT_RULES, ...rules }
   const terrain = scene.layers.filter((l): l is Layer & { edge: NonNullable<Layer['edge']> } => l.role === 'terrain' && !!l.edge)
   if (!terrain.length) return { score: 0, issues: [] }
 

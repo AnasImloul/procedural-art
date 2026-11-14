@@ -1,10 +1,10 @@
-import { makeComposition, type Composition } from './compose'
+import { type Composition, makeComposition } from './compose'
 import { cycleMoods, type MoodId } from './moods'
-import { blendPalettes, makePalette, type Atmosphere, type Palette, type PaletteOverrides } from './palette'
+import { type Atmosphere, blendPalettes, makePalette, type Palette, type PaletteOverrides } from './palette'
 import { assessComposition, type QualityRules } from './quality'
 import { Rng } from './rng'
-import { makeWobble, type Wobble } from './wobble'
 import { finalize, type Layer, type LoopMode, type ParamValue, type PostFx, type Scene } from './scene'
+import { makeWobble, type Wobble } from './wobble'
 
 export interface Env {
   palette: Palette
@@ -62,8 +62,7 @@ export function resolveParams<S extends ParamSchema>(schema: S, rng: Rng, overri
   const values: Record<string, ParamValue> = {}
   for (const [key, spec] of Object.entries(schema)) {
     const r = rng.fork(key)
-    const seeded =
-      spec.kind === 'range' ? r.range(spec.min, spec.max) : spec.kind === 'int' ? r.int(spec.min, spec.max) : r.chance(spec.p)
+    const seeded = spec.kind === 'range' ? r.range(spec.min, spec.max) : spec.kind === 'int' ? r.int(spec.min, spec.max) : r.chance(spec.p)
     const override = overrides[key]
     values[key] = override !== undefined && typeof override === typeof seeded ? override : seeded
   }
@@ -91,7 +90,9 @@ export function cyclePalette(theme: Theme, seed: string, hour: number): Palette 
 }
 
 function stillForCycle(layers: Layer[]): Layer[] {
-  return layers.map((layer) => (layer.motion ? { ...layer, motion: layer.clip ? undefined : layer.motion.filter((m) => m.type === 'drift' || m.type === 'pose') } : layer))
+  return layers.map((layer) =>
+    layer.motion ? { ...layer, motion: layer.clip ? undefined : layer.motion.filter((m) => m.type === 'drift' || m.type === 'pose') } : layer,
+  )
 }
 
 function withPan(layers: Layer[], speed: number): Layer[] {
@@ -104,12 +105,14 @@ function withPan(layers: Layer[], speed: number): Layer[] {
 
 const MAX_ATTEMPTS = 6
 
-export function generate<S extends ParamSchema>(theme: Theme<S>, { seed, aspect, mood, loop = 'ambient', cycle = false, hour = 12, overrides }: GenerateOptions): Scene {
+export function generate<S extends ParamSchema>(
+  theme: Theme<S>,
+  { seed, aspect, mood, loop = 'ambient', cycle = false, hour = 12, overrides }: GenerateOptions,
+): Scene {
   const root = new Rng(`${theme.id}/v${theme.version}/${seed}`)
-  const palette =
-    cycle
-      ? cyclePalette(theme as unknown as Theme, seed, hour)
-      : makePalette(root.fork('palette'), mood ?? root.fork('mood').weighted(theme.moods), theme.atmosphere, theme.palette)
+  const palette = cycle
+    ? cyclePalette(theme as unknown as Theme, seed, hour)
+    : makePalette(root.fork('palette'), mood ?? root.fork('mood').weighted(theme.moods), theme.atmosphere, theme.palette)
   const params = resolveParams(theme.params, root.fork('params'), overrides)
   const pan = { ...DEFAULT_PAN, ...theme.loop?.pan }
   const cycleSeconds = theme.loop?.cycle ?? DEFAULT_CYCLE_SECONDS

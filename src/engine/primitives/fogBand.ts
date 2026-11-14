@@ -1,9 +1,9 @@
-import { withAlpha, type Color } from '../color'
+import { type Color, withAlpha } from '../color'
 import { lerp, smoothstep } from '../math'
 import { loopNoise1D } from '../noise'
 import { polygon, rect } from '../path'
 import type { Rng } from '../rng'
-import { solid, type Layer, type Shape, type Vec } from '../scene'
+import { type Layer, type Shape, solid, type Vec } from '../scene'
 import type { Env } from '../theme'
 
 export interface FogBandOptions {
@@ -22,9 +22,7 @@ export function fogBand(env: Env, rng: Rng, { depth, y, height, density, strips 
     const t = i / 5
     return [t, withAlpha(haze, density * 0.75 * smoothstep(t))]
   })
-  const shapes: Shape[] = [
-    { d: rect(-0.01, top, env.aspect + 0.02, 1.02 - top), fill: { type: 'linear', from: [0, top], to: [0, y], stops } },
-  ]
+  const shapes: Shape[] = [{ d: rect(-0.01, top, env.aspect + 0.02, 1.02 - top), fill: { type: 'linear', from: [0, top], to: [0, y], stops } }]
 
   const samples = Math.ceil(env.aspect * 90)
   for (let s = 0; s < strips; s++) {

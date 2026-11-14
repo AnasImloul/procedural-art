@@ -29,14 +29,13 @@ export interface Composition {
   depthSteps(count: number, range: { near: number; far: number }): number[]
 }
 
-const third = (rng: Rng, aspect: number, side: Side) =>
-  aspect * (side === 'left' ? rng.range(0.25, 0.38) : rng.range(0.62, 0.75))
+const third = (rng: Rng, aspect: number, side: Side) => aspect * (side === 'left' ? rng.range(0.25, 0.38) : rng.range(0.62, 0.75))
 
 export function celestialAt(hour: number, { horizon, dir }: Orbit, aspect: number): Omit<Celestial, 'anchor' | 'orbit'> {
   const h = ((hour % 24) + 24) % 24
   const arc = (s: number): Vec => [lerp(-0.08, 1.08, dir > 0 ? s : 1 - s) * aspect, horizon + 0.05 - Math.sin(Math.PI * s) * horizon * 0.78]
   const sun = arc((h - 6) / 12)
-  const moon = arc((((h - 18) % 24) + 24) % 24 / 12)
+  const moon = arc(((((h - 18) % 24) + 24) % 24) / 12)
   const sunWeight = smoothstep((h - 4) / 1.5) * (1 - smoothstep((h - 18.5) / 1.5))
   return { light: sunWeight >= 0.5 ? sun : moon, sun, moon, sunWeight }
 }
@@ -59,7 +58,6 @@ export function makeComposition(rng: Rng, aspect: number, hour?: number): Compos
     framingSide: other,
     celestial,
     sunPosition: (horizon) => celestial(horizon).light,
-    depthSteps: (count, { near, far }) =>
-      Array.from({ length: count }, (_, i) => lerp(far, near, count === 1 ? 1 : i / (count - 1))),
+    depthSteps: (count, { near, far }) => Array.from({ length: count }, (_, i) => lerp(far, near, count === 1 ? 1 : i / (count - 1))),
   }
 }

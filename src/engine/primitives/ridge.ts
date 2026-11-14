@@ -24,7 +24,6 @@ export interface RidgeOptions {
   dips?: { x: number; width: number; amount: number }[]
 }
 
-
 const wrapX = (x: number, period: number) => x - period * Math.floor(x / period)
 
 interface Knot {
@@ -69,7 +68,11 @@ function peakProfile(rng: Rng, period: number, spacing: number) {
   }
 }
 
-export function ridge(env: Env, rng: Rng, { depth, baseline, amplitude, frequency, peak, rim, behind, light, faces = 1, peakBoost = 0.45, lowers = [], dips = [], snowline }: RidgeOptions): Layer {
+export function ridge(
+  env: Env,
+  rng: Rng,
+  { depth, baseline, amplitude, frequency, peak, rim, behind, light, faces = 1, peakBoost = 0.45, lowers = [], dips = [], snowline }: RidgeOptions,
+): Layer {
   const period = env.aspect
   const freq = frequency ?? lerp(2.4, 1.1, depth)
   const soft = loopNoise1D(rng.fork('soft'))
@@ -89,8 +92,7 @@ export function ridge(env: Env, rng: Rng, { depth, baseline, amplitude, frequenc
     const x = lerp(-0.01, period + 0.01, i / samples)
     const mask = smoothstep((rocky(x, period, { octaves: 2, frequency: 2.2 }) - 0.45) / 0.25)
     const rolling = soft(x, period, { octaves: 3, frequency: freq }) + (bumps(x, period, { octaves: 3, frequency: freq * 4 }) - 0.5) * 0.12 * mask
-    const peaks =
-      profile(x) + (detail(x, period, { octaves: 4, frequency: freq * 4, ridged: true }) - 0.5) * 0.16 * (0.2 + 1.4 * mask) * farCalm
+    const peaks = profile(x) + (detail(x, period, { octaves: 4, frequency: freq * 4, ridged: true }) - 0.5) * 0.16 * (0.2 + 1.4 * mask) * farCalm
     let envelope = 1 - peakBoost + peakBoost * bump(x, peakX, peakWidth, period)
     for (const dip of dips) envelope *= 1 - dip.amount * bump(x, dip.x, dip.width, period)
     xs.push(x)

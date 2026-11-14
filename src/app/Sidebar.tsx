@@ -1,12 +1,12 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { MOOD_IDS, type MoodId } from '../engine/moods'
 import type { AspectId, LoopMode, Scene } from '../engine/scene'
 import type { ParamOverrides, Theme } from '../engine/theme'
 import { renderSvg, type SvgMode } from '../render/svg'
 import { exportCycleVideo, exportVideo } from '../render/video'
-import { cycleLoader, cycleSource } from './cycle'
 import { THEMES } from '../themes'
-import { exportPool, download } from './render'
+import { cycleLoader, cycleSource } from './cycleSource'
+import { download, exportPool } from './pools'
 import { ASPECT_IDS, DEFAULT_HOUR, EXPORT_PRESETS, VIDEO_PRESETS, type ViewState } from './state'
 import { Thumb } from './Thumb'
 
@@ -35,17 +35,7 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   )
 }
 
-function Chips<T extends string>({
-  items,
-  value,
-  label,
-  onChange,
-}: {
-  items: readonly T[]
-  value: T
-  label?: (item: T) => string
-  onChange(item: T): void
-}) {
+function Chips<T extends string>({ items, value, label, onChange }: { items: readonly T[]; value: T; label?: (item: T) => string; onChange(item: T): void }) {
   const name = useId()
   return (
     <div className="chips" role="radiogroup">
@@ -80,17 +70,7 @@ function SeedField({ seed, onCommit }: { seed: string; onCommit(seed: string): v
   )
 }
 
-function Params({
-  theme,
-  scene,
-  overrides,
-  onChange,
-}: {
-  theme: Theme
-  scene: Scene
-  overrides: ParamOverrides
-  onChange(overrides: ParamOverrides): void
-}) {
+function Params({ theme, scene, overrides, onChange }: { theme: Theme; scene: Scene; overrides: ParamOverrides; onChange(overrides: ParamOverrides): void }) {
   return (
     <div className="params">
       {Object.entries(theme.params).map(([key, spec]) => {
@@ -104,12 +84,7 @@ function Params({
           <div key={key} className={`param${locked ? ' is-locked' : ''}`}>
             <label htmlFor={`param-${key}`}>{key}</label>
             {spec.kind === 'chance' ? (
-              <input
-                id={`param-${key}`}
-                type="checkbox"
-                checked={value as boolean}
-                onChange={(e) => onChange({ ...overrides, [key]: e.target.checked })}
-              />
+              <input id={`param-${key}`} type="checkbox" checked={value as boolean} onChange={(e) => onChange({ ...overrides, [key]: e.target.checked })} />
             ) : (
               <input
                 id={`param-${key}`}
@@ -177,7 +152,9 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
       download(result.blob, `${baseName}-${state.loop ?? 'ambient'}${state.cycle ? '-day' : ''}-${width}x${height}${result.extension}`)
       setMessage(`Saved ${result.codec.toUpperCase()} ${result.extension.slice(1).toUpperCase()}, ${scene.loop.seconds} s loop`)
     } catch (err) {
-      setMessage(err instanceof DOMException && err.name === 'AbortError' ? 'Video export cancelled' : err instanceof Error ? err.message : 'Video export failed')
+      setMessage(
+        err instanceof DOMException && err.name === 'AbortError' ? 'Video export cancelled' : err instanceof Error ? err.message : 'Video export failed',
+      )
     } finally {
       videoAbort.current = null
       setVideo(null)
@@ -206,10 +183,20 @@ function ExportPanel({ state, theme, scene }: { state: ViewState; theme: Theme; 
         ))}
       </div>
       <div className="export-row">
-        <button type="button" className="button" onClick={() => exportSvg('clean')} title="No filters or blend modes. Safe for Illustrator, Figma and plotters.">
+        <button
+          type="button"
+          className="button"
+          onClick={() => exportSvg('clean')}
+          title="No filters or blend modes. Safe for Illustrator, Figma and plotters."
+        >
           SVG clean
         </button>
-        <button type="button" className="button" onClick={() => exportSvg('styled')} title="Adds the paper texture as a tiled image that scales with the artwork.">
+        <button
+          type="button"
+          className="button"
+          onClick={() => exportSvg('styled')}
+          title="Adds the paper texture as a tiled image that scales with the artwork."
+        >
           SVG styled
         </button>
       </div>
@@ -262,7 +249,18 @@ export function Sidebar({ state, theme, scene, canGoBack, canGoForward, update, 
               key={t.id}
               label={t.name}
               active={t.id === state.theme}
-              job={{ theme: t.id, seed: state.seed, aspect: '16:9', mood: state.mood, loop: state.loop, cycle: state.cycle, hour: state.hour, overrides: {}, width: 320, height: 180 }}
+              job={{
+                theme: t.id,
+                seed: state.seed,
+                aspect: '16:9',
+                mood: state.mood,
+                loop: state.loop,
+                cycle: state.cycle,
+                hour: state.hour,
+                overrides: {},
+                width: 320,
+                height: 180,
+              }}
               onSelect={() => update({ theme: t.id, version: undefined })}
             />
           ))}

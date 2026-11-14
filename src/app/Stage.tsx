@@ -27,11 +27,7 @@ const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: r
 function PlayIcon({ playing }: { playing: boolean }) {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      {playing ? (
-        <path d="M4 3h3v10H4zM9 3h3v10H9z" fill="currentColor" />
-      ) : (
-        <path d="M4.5 2.5v11l9-5.5z" fill="currentColor" />
-      )}
+      {playing ? <path d="M4 3h3v10H4zM9 3h3v10H9z" fill="currentColor" /> : <path d="M4.5 2.5v11l9-5.5z" fill="currentColor" />}
     </svg>
   )
 }
@@ -59,9 +55,7 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
   const cycleKey = cycle?.source.key
 
   useLayoutEffect(() => {
-    const observer = new ResizeObserver(([entry]) =>
-      setBox({ width: entry.contentRect.width, height: entry.contentRect.height }),
-    )
+    const observer = new ResizeObserver(([entry]) => setBox({ width: entry.contentRect.width, height: entry.contentRect.height }))
     observer.observe(wrapRef.current!)
     return () => {
       observer.disconnect()
@@ -105,12 +99,13 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
     canvas.width = size.width
     canvas.height = size.height
     const started = performance.now()
-    const t = isCycle ? ((cycleRef.current!.hour % 24) + 24) % 24 / 24 : pausedAt
+    const t = isCycle ? (((cycleRef.current!.hour % 24) + 24) % 24) / 24 : pausedAt
     renderScene(canvas.getContext('2d')!, scene, { width: size.width, height: size.height, t })
     onRendered(performance.now() - started)
     if (!playing) showTime(isCycle ? (cycleRef.current!.hour % 24) / 24 : pausedAt)
   }, [playing, scene, size, pausedAt, onRendered, isCycle, cycleActive, showTime])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cycleKey restarts playback when the cycle source changes; the source itself is read through cycleRef so mood or hour changes don't restart it
   useEffect(() => {
     if (!playing || !size || !isCycle) return
     const canvas = cycleCanvasRef.current!
@@ -237,7 +232,7 @@ export function Stage({ scene, cycle, onRendered }: StageProps) {
           max={1}
           step={0.0005}
           defaultValue={0}
-          aria-label={isCycle ? "Time of day" : "Time"}
+          aria-label={isCycle ? 'Time of day' : 'Time'}
           onChange={(e) => scrub(Number(e.target.value))}
         />
         <span ref={labelRef} className="transport-time" />

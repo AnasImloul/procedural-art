@@ -18,7 +18,10 @@ function toStyle(ctx: Ctx2D, paint: Paint): string | CanvasGradient {
 
 function fillSquashed(ctx: Ctx2D, path: Path2D, paint: Extract<Paint, { type: 'radial' }>, squash: number) {
   const [cx, cy] = paint.center
-  const inverse = new DOMMatrix().translate(cx, cy).scale(1, 1 / squash).translate(-cx, -cy)
+  const inverse = new DOMMatrix()
+    .translate(cx, cy)
+    .scale(1, 1 / squash)
+    .translate(-cx, -cy)
   const local = new Path2D()
   local.addPath(path, inverse)
   ctx.save()

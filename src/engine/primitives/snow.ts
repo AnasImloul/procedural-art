@@ -2,7 +2,7 @@ import { mix } from '../color'
 import { loopNoise1D } from '../noise'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
-import { solid, type Shape, type Vec } from '../scene'
+import { type Shape, solid, type Vec } from '../scene'
 import type { Env } from '../theme'
 
 export interface SnowOptions {

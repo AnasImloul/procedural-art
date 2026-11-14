@@ -12,7 +12,15 @@ export function grassTuft(rng: Rng, x: number, base: number, height: number, lea
     const w = height * 0.035
     const bx = x + spread * height * 0.12
     const midX = (bx + tipX) / 2 + lean * h * 0.08
-    paths.push(polygon([[bx - w, base], [midX, base - h * 0.55], [tipX, base - h], [midX + w * 0.6, base - h * 0.5], [bx + w, base]]))
+    paths.push(
+      polygon([
+        [bx - w, base],
+        [midX, base - h * 0.55],
+        [tipX, base - h],
+        [midX + w * 0.6, base - h * 0.5],
+        [bx + w, base],
+      ]),
+    )
   }
   return paths.join('')
 }
@@ -25,7 +33,14 @@ export function shrub(rng: Rng, x: number, base: number, size: number): string {
     const r = size * rng.range(0.28, 0.42) * (1 - Math.abs(u) * 0.3)
     paths.push(circle(x + u * size * 0.45, base - r * rng.range(0.7, 1.1), r))
   }
-  paths.push(polygon([[x - size * 0.6, base + size * 0.05], [x + size * 0.6, base + size * 0.05], [x + size * 0.5, base - size * 0.15], [x - size * 0.5, base - size * 0.15]]))
+  paths.push(
+    polygon([
+      [x - size * 0.6, base + size * 0.05],
+      [x + size * 0.6, base + size * 0.05],
+      [x + size * 0.5, base - size * 0.15],
+      [x - size * 0.5, base - size * 0.15],
+    ]),
+  )
   return paths.join('')
 }
 

@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MOOD_IDS } from '../engine/moods'
 import { ASPECTS, checkScene } from '../engine/scene'
 import { generate } from '../engine/theme'
-import { THEMES, findTheme } from '../themes'
-import { cycleLoader, cycleSource } from './cycle'
+import { findTheme, THEMES } from '../themes'
+import { cycleLoader, cycleSource } from './cycleSource'
 import { Sidebar } from './Sidebar'
-import { clock, Stage, type CycleProps } from './Stage'
+import { type CycleProps, clock, Stage } from './Stage'
 import { ASPECT_IDS, DEFAULT_HOUR, randomSeed, readHash, toHash, type ViewState } from './state'
 import { Thumb } from './Thumb'
 
@@ -78,7 +78,14 @@ export function App() {
       else if (e.key === 'ArrowRight') forward()
       else if (e.key === 'm') update({ mood: cycle([undefined, ...MOOD_IDS], state.mood) })
       else if (e.key === 'a') update({ aspect: cycle(ASPECT_IDS, state.aspect) })
-      else if (e.key === 't') update({ theme: cycle(THEMES.map((t) => t.id), state.theme), version: undefined })
+      else if (e.key === 't')
+        update({
+          theme: cycle(
+            THEMES.map((t) => t.id),
+            state.theme,
+          ),
+          version: undefined,
+        })
       else return
       e.preventDefault()
     }

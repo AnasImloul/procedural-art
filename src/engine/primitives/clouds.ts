@@ -1,10 +1,10 @@
-import { mix, type Color } from '../color'
+import { type Color, mix } from '../color'
 import { clamp, lerp } from '../math'
 import type { MoodId } from '../moods'
 import { loopNoise1D } from '../noise'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
-import { solid, type Layer, type Paint, type Shape, type Vec } from '../scene'
+import { type Layer, type Paint, type Shape, solid, type Vec } from '../scene'
 import type { Env } from '../theme'
 
 export interface CloudscapeOptions {
@@ -121,8 +121,30 @@ function streak(rng: Rng, cx: number, y: number, width: number, sunward: number,
   const from: Vec = [cx - (sunward * width) / 2, y]
   const to: Vec = [cx + (sunward * width) / 2, y]
   return [
-    { outline: [...top, ...[...bottom].reverse()], fill: { type: 'linear', from, to, stops: [[0, t.shadow], [1, t.lit]] } },
-    { outline: [...under, ...[...bottom].reverse()], fill: { type: 'linear', from, to, stops: [[0, t.lit], [1, mix(t.hot, t.glow, 0.4)]] } },
+    {
+      outline: [...top, ...[...bottom].reverse()],
+      fill: {
+        type: 'linear',
+        from,
+        to,
+        stops: [
+          [0, t.shadow],
+          [1, t.lit],
+        ],
+      },
+    },
+    {
+      outline: [...under, ...[...bottom].reverse()],
+      fill: {
+        type: 'linear',
+        from,
+        to,
+        stops: [
+          [0, t.lit],
+          [1, mix(t.hot, t.glow, 0.4)],
+        ],
+      },
+    },
   ]
 }
 
@@ -145,7 +167,16 @@ function deck(rng: Rng, period: number, top: number, thickness: number, t: Tones
   }
   return {
     outline: [...upper, ...lower.reverse()],
-    fill: { type: 'linear', from: [0, top - thickness * 0.2], to: [0, top + thickness * 1.5], stops: [[0, t.lit], [0.6, mix(t.lit, t.shadow, 0.5)], [1, t.shadow]] },
+    fill: {
+      type: 'linear',
+      from: [0, top - thickness * 0.2],
+      to: [0, top + thickness * 1.5],
+      stops: [
+        [0, t.lit],
+        [0.6, mix(t.lit, t.shadow, 0.5)],
+        [1, t.shadow],
+      ],
+    },
   }
 }
 

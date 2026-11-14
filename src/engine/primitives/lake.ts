@@ -2,7 +2,7 @@ import { mix, withAlpha } from '../color'
 import { lerp } from '../math'
 import { polygon, rect } from '../path'
 import type { Rng } from '../rng'
-import { solid, type Layer, type Shape, type Vec } from '../scene'
+import { type Layer, type Shape, solid, type Vec } from '../scene'
 import type { Env } from '../theme'
 
 export interface LakeOptions {

@@ -4,7 +4,7 @@ import { lerp, smoothstep } from '../math'
 import { loopNoise1D } from '../noise'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
-import { solid, type Layer, type Vec } from '../scene'
+import { type Layer, solid, type Vec } from '../scene'
 import type { Env } from '../theme'
 import { pine } from './pine'
 

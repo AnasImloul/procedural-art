@@ -2,7 +2,7 @@ import type { MoodId } from '../engine/moods'
 import { ASPECTS, type AspectId, type Layer, type LoopMode, type Scene } from '../engine/scene'
 import { generate, type ParamOverrides } from '../engine/theme'
 import { findTheme } from '../themes'
-import { drawLayers, renderScene, type Ctx2D } from './canvas'
+import { type Ctx2D, drawLayers, renderScene } from './canvas'
 
 export interface RenderJob {
   theme: string
@@ -69,7 +69,15 @@ function paintedRows(ctx: Ctx2D, width: number, height: number): [number, number
 function sceneFor(job: RenderJob): Scene {
   const theme = findTheme(job.theme)
   if (!theme) throw new Error(`Unknown theme: ${job.theme}`)
-  return generate(theme, { seed: job.seed, aspect: ASPECTS[job.aspect], mood: job.mood, loop: job.loop, cycle: job.cycle, hour: job.hour, overrides: job.overrides })
+  return generate(theme, {
+    seed: job.seed,
+    aspect: ASPECTS[job.aspect],
+    mood: job.mood,
+    loop: job.loop,
+    cycle: job.cycle,
+    hour: job.hour,
+    overrides: job.overrides,
+  })
 }
 
 function canvasFor(width: number, height: number): { canvas: OffscreenCanvas | HTMLCanvasElement; ctx: Ctx2D } {
@@ -88,9 +96,7 @@ export async function renderToBlob(job: RenderJob): Promise<Blob> {
   const { canvas, ctx } = canvasFor(job.width, job.height)
   renderScene(ctx, scene, job)
   if ('convertToBlob' in canvas) return canvas.convertToBlob({ type: 'image/png' })
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Canvas export failed'))), 'image/png'),
-  )
+  return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Canvas export failed'))), 'image/png'))
 }
 
 export async function renderKeyframe(job: KeyframeJob): Promise<KeyframePart[]> {

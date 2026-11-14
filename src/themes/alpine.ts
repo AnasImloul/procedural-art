@@ -1,7 +1,7 @@
-import { lerp, smoothstep } from '@/engine/math'
-import { birds, cloudscape, fogBand, forest, lake, lightShafts, ridge, sky, stars, sun, sunHaze, treeline } from '@/engine/primitives'
-import type { Layer, Vec } from '@/engine/scene'
-import { defineTheme, param } from '@/engine/theme'
+import { lerp, smoothstep } from '../engine/math'
+import { birds, cloudscape, fogBand, forest, lake, lightShafts, ridge, sky, stars, sun, sunHaze, treeline } from '../engine/primitives'
+import type { Layer, Vec } from '../engine/scene'
+import { defineTheme, param } from '../engine/theme'
 
 export default defineTheme({
   id: 'alpine',
@@ -117,9 +117,7 @@ export default defineTheme({
         )
       }
       if (near && p.framing && loop !== 'pan') {
-        layers.push(
-          treeline(env, rng.fork('framing'), { on: r, height: [0.28, 0.5], density: 0.85, side: comp.framingSide, reach: 0.28 }),
-        )
+        layers.push(treeline(env, rng.fork('framing'), { on: r, height: [0.28, 0.5], density: 0.85, side: comp.framingSide, reach: 0.28 }))
       }
       if (near && p.framing && loop === 'pan') {
         layers.push(treeline(env, rng.fork('framing'), { on: r, height: [0.14, 0.32], density: 0.3 }))

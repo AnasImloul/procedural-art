@@ -1,5 +1,5 @@
 import type { RenderJob } from '../render/jobs'
-import { thumbPool, useDebounced, useRenderedImage } from './render'
+import { thumbPool, useDebounced, useRenderedImage } from './pools'
 
 interface ThumbProps {
   job: RenderJob

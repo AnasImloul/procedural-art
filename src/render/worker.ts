@@ -1,4 +1,4 @@
-import { renderKeyframe, renderToBlob, type KeyframeJob, type RenderJob } from './jobs'
+import { type KeyframeJob, type RenderJob, renderKeyframe, renderToBlob } from './jobs'
 
 self.postMessage({ ready: typeof OffscreenCanvas !== 'undefined' && typeof Path2D !== 'undefined' })
 

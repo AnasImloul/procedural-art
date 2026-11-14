@@ -1,6 +1,6 @@
 import { circle } from '../path'
 import type { Rng } from '../rng'
-import { solid, type Layer, type Shape } from '../scene'
+import { type Layer, type Shape, solid } from '../scene'
 import type { Env } from '../theme'
 
 export interface StarsOptions {

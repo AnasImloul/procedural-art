@@ -2,18 +2,28 @@
   "name": "procedural-art",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc",
+    "lint": "biome check",
+    "format": "biome check --write",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc && biome check && vitest run",
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.7",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.8"
+    "vite": "^8.3.8",
+    "vitest": "5.1.0"
   },
   "dependencies": {
     "mediabunny": "^1.65.2",

@@ -1,6 +1,6 @@
-import { mix, type Color } from './color'
+import { type Color, mix } from './color'
 import { clamp, lerp } from './math'
-import { ANCHOR_KEYS, MOOD_LIGHT, MOODS, type AnchorKey, type Anchors, type MoodId, type MoodLight } from './moods'
+import { ANCHOR_KEYS, type AnchorKey, type Anchors, MOOD_LIGHT, MOODS, type MoodId, type MoodLight } from './moods'
 import type { Rng } from './rng'
 
 const MID = 0.45

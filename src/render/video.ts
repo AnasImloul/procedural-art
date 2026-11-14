@@ -75,11 +75,7 @@ export async function exportVideo(scene: Scene, options: VideoOptions): Promise<
   }
 }
 
-export async function exportCycleVideo(
-  source: CycleSource,
-  loader: KeyframeLoader,
-  options: VideoOptions & { startHour: number },
-): Promise<VideoResult> {
+export async function exportCycleVideo(source: CycleSource, loader: KeyframeLoader, options: VideoOptions & { startHour: number }): Promise<VideoResult> {
   const canvas = exportCanvas(options.width, options.height)
   const compositor = CycleCompositor.create(canvas, { preserveDrawingBuffer: true })
   if (!compositor) throw new Error('Video export needs WebGL2')

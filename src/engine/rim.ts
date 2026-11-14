@@ -1,7 +1,7 @@
 import { mix } from './color'
 import { lerp, smoothstep } from './math'
 import type { Palette } from './palette'
-import { solid, type Layer, type Shape, type Vec } from './scene'
+import { type Layer, type Shape, solid, type Vec } from './scene'
 
 const LEVELS = 4
 const f = (n: number) => String(Math.round(n * 1e4) / 1e4)

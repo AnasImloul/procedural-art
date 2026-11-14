@@ -1,8 +1,8 @@
 import type { Color } from './color'
 import type { Palette } from './palette'
 import { mirrorPathY, wobblePath } from './path'
-import type { Wobble } from './wobble'
 import { rimLight } from './rim'
+import type { Wobble } from './wobble'
 
 export type Vec = [number, number]
 
@@ -109,7 +109,13 @@ export function finalize(layers: Layer[], palette: Palette, outline: 'rim' | 'co
     })
   return finished.flatMap((layer, i) =>
     layer.lake && layer.clip
-      ? [...finished.slice(0, i).filter((l) => !l.lake && l.role !== 'water' && !l.motion?.some((m) => m.type === 'pose')).map((l) => reflect(l, layer.lake!.waterline, layer.clip!)), layer]
+      ? [
+          ...finished
+            .slice(0, i)
+            .filter((l) => !l.lake && l.role !== 'water' && !l.motion?.some((m) => m.type === 'pose'))
+            .map((l) => reflect(l, layer.lake!.waterline, layer.clip!)),
+          layer,
+        ]
       : [layer],
   )
 }

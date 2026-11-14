@@ -3,9 +3,9 @@ import { sampleEdge } from '../geometry'
 import { smoothstep } from '../math'
 import { loopNoise1D } from '../noise'
 import type { Rng } from '../rng'
-import { solid, type Layer } from '../scene'
+import { type Layer, solid } from '../scene'
 import type { Env } from '../theme'
-import { grassTuft, shrub } from './desert'
+import { grassTuft, shrub } from './plants'
 
 export interface ScrubOptions {
   on: Layer

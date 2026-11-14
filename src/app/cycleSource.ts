@@ -1,8 +1,8 @@
 import type { Scene } from '../engine/scene'
-import { keyframeRuns } from '../render/jobs'
 import { cyclePalette, type Theme } from '../engine/theme'
+import { keyframeRuns } from '../render/jobs'
 import type { CycleSource, KeyframeLoader } from '../render/webgl/cycle'
-import { cyclePool } from './render'
+import { cyclePool } from './pools'
 import type { ViewState } from './state'
 
 export function cycleSource(theme: Theme, state: ViewState, scene: Scene): CycleSource | undefined {
@@ -23,5 +23,15 @@ export function cycleSource(theme: Theme, state: ViewState, scene: Scene): Cycle
 export const cycleLoader =
   (state: Pick<ViewState, 'theme' | 'seed' | 'aspect' | 'loop' | 'overrides'>): KeyframeLoader =>
   (hour, width, height) =>
-    cyclePool.keyframe({ theme: state.theme, seed: state.seed, aspect: state.aspect, loop: state.loop, cycle: true, overrides: state.overrides, hour, width, height, keyframe: true })
-      .promise
+    cyclePool.keyframe({
+      theme: state.theme,
+      seed: state.seed,
+      aspect: state.aspect,
+      loop: state.loop,
+      cycle: true,
+      overrides: state.overrides,
+      hour,
+      width,
+      height,
+      keyframe: true,
+    }).promise

@@ -1,12 +1,12 @@
-import { toRgb, type Color } from '../../engine/color'
+import { type Color, toRgb } from '../../engine/color'
 import { celestialAt, type Orbit } from '../../engine/compose'
 import { DAY_CYCLE } from '../../engine/moods'
-import { MOON_COLOR, MOON_GLOW } from '../../engine/primitives/sun'
 import type { Palette } from '../../engine/palette'
+import { MOON_COLOR, MOON_GLOW } from '../../engine/primitives/sun'
 import type { PostFx } from '../../engine/scene'
 import { GRAIN_REFERENCE_HEIGHT, grainSeeds } from '../grain'
 import type { KeyframePart, RunInfo } from '../jobs'
-import { bindPaper, compile, paperTexture, POST } from './compositor'
+import { bindPaper, compile, POST, paperTexture } from './compositor'
 
 const CROSSFADE = `#version 300 es
 precision highp float;

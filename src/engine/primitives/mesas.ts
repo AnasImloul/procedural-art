@@ -3,7 +3,7 @@ import { lerp } from '../math'
 import { loopNoise1D } from '../noise'
 import { polygon } from '../path'
 import type { Rng } from '../rng'
-import { solid, type Layer, type Paint, type Shape, type Vec } from '../scene'
+import { type Layer, type Paint, type Shape, solid, type Vec } from '../scene'
 import type { Env } from '../theme'
 
 export interface MesasOptions {
@@ -64,7 +64,9 @@ export function mesas(env: Env, rng: Rng, { depth, baseline, height, count: [cMi
       cliff: r.range(0.08, 0.16),
       apron: r.range(0.25, 0.55),
       tilt: r.range(-0.06, 0.06),
-      tier: r.chance(big ? 0.45 : 0.25) ? { offset: half * r.range(-0.35, 0.35), half: half * r.range(0.22, 0.38), height: height * r.range(0.2, 0.4) } : undefined,
+      tier: r.chance(big ? 0.45 : 0.25)
+        ? { offset: half * r.range(-0.35, 0.35), half: half * r.range(0.22, 0.38), height: height * r.range(0.2, 0.4) }
+        : undefined,
     })
     cursor += (period / count) * r.range(0.55, 1.45)
   }
@@ -119,7 +121,7 @@ export function mesas(env: Env, rng: Rng, { depth, baseline, height, count: [cMi
       const inner = f.x + start - dir * f.half * 0.04
       return [...pts, [f.x + dir * reach, baseline + height * 0.05], [inner, baseline + height * 0.05], [inner, top(start)]] as Vec[]
     }
-    copies(side((-sunSide) as 1 | -1), shadow)
+    copies(side(-sunSide as 1 | -1), shadow)
     copies(side(sunSide as 1 | -1), lit)
 
     const bands = r.int(2, 3)
@@ -133,8 +135,24 @@ export function mesas(env: Env, rng: Rng, { depth, baseline, height, count: [cMi
       if (lo + hi < f.half * 0.3) continue
       const left = f.x - lo
       const right = f.x + hi
-      copies([[left, y0], [right, y0], [right, y0 + thick], [left, y0 + thick]], band)
-      copies([[left, y0 - thick * 0.35], [right, y0 - thick * 0.35], [right, y0], [left, y0]], bandLight)
+      copies(
+        [
+          [left, y0],
+          [right, y0],
+          [right, y0 + thick],
+          [left, y0 + thick],
+        ],
+        band,
+      )
+      copies(
+        [
+          [left, y0 - thick * 0.35],
+          [right, y0 - thick * 0.35],
+          [right, y0],
+          [left, y0],
+        ],
+        bandLight,
+      )
     }
   }
 
