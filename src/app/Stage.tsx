@@ -57,6 +57,8 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
   const scrubbingRef = useRef(false)
   const committingRef = useRef(false)
   const commitTimer = useRef(0)
+  const ambientRef = useRef<HTMLCanvasElement>(null)
+  const ambientAt = useRef(0)
   const loopMs = scene.loop.seconds * 1000
   const isCycle = !!cycle
   const cycleKey = cycle?.source.key
@@ -97,6 +99,14 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
     setScrubbingState(value)
   }, [])
 
+  const sampleAmbient = useCallback((source: HTMLCanvasElement, force = false) => {
+    const now = performance.now()
+    const ambient = ambientRef.current
+    if (!ambient || (!force && now - ambientAt.current < 125)) return
+    ambientAt.current = now
+    ambient.getContext('2d')?.drawImage(source, 0, 0, ambient.width, ambient.height)
+  }, [])
+
   const showTime = useCallback(
     (t: number) => {
       if (sliderRef.current) {
@@ -112,7 +122,7 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
   const cssHeight = display?.cssHeight
   useEffect(() => {
     if (!cssWidth || !cssHeight) return
-    for (const canvas of [canvasRef.current!, glCanvasRef.current!, cycleCanvasRef.current!]) {
+    for (const canvas of [canvasRef.current!, glCanvasRef.current!, cycleCanvasRef.current!, ambientRef.current!]) {
       canvas.style.width = `${cssWidth}px`
       canvas.style.height = `${cssHeight}px`
     }
@@ -131,13 +141,14 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
     const started = performance.now()
     const t = isCycle ? (((cycleRef.current!.hour % 24) + 24) % 24) / 24 : pausedAt
     renderScene(canvas.getContext('2d')!, scene, { width: size.width, height: size.height, t })
+    sampleAmbient(canvas, true)
     onRendered(performance.now() - started)
     if (!playing) showTime(isCycle ? (cycleRef.current!.hour % 24) / 24 : pausedAt)
     if (committingRef.current) {
       committingRef.current = false
       setScrubbing(false)
     }
-  }, [playing, scene, size, pausedAt, onRendered, isCycle, cycleActive, showTime, setScrubbing])
+  }, [playing, scene, size, pausedAt, onRendered, isCycle, cycleActive, showTime, setScrubbing, sampleAmbient])
 
   const startCycle = useCallback(() => {
     const canvas = cycleCanvasRef.current!
@@ -171,9 +182,12 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
       const t = elapsed - Math.floor(elapsed)
       timeRef.current = t
       const started = performance.now()
-      if (compositor.render(t * 24, t) && !ready) {
-        ready = true
-        setCycleActive(true)
+      if (compositor.render(t * 24, t)) {
+        sampleAmbient(cycleCanvasRef.current!)
+        if (!ready) {
+          ready = true
+          setCycleActive(true)
+        }
       }
       total += performance.now() - started
       if (++frames === 30) {
@@ -189,7 +203,7 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
       cancelAnimationFrame(frame)
       setCycleActive(false)
     }
-  }, [playing, size, isCycle, cycleKey, loopMs, onRendered, showTime, startCycle])
+  }, [playing, size, isCycle, cycleKey, loopMs, onRendered, showTime, startCycle, sampleAmbient])
 
   useEffect(() => {
     if (playing || !scrubbing || !isCycle) return
@@ -198,12 +212,15 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
     let frame = 0
     const tick = () => {
       const t = timeRef.current
-      if (compositor.render(t * 24, t)) setCycleActive(true)
+      if (compositor.render(t * 24, t)) {
+        sampleAmbient(cycleCanvasRef.current!)
+        setCycleActive(true)
+      }
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [playing, scrubbing, isCycle, startCycle])
+  }, [playing, scrubbing, isCycle, startCycle, sampleAmbient])
 
   useEffect(() => () => clearTimeout(commitTimer.current), [])
 
@@ -235,6 +252,7 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
       const started = performance.now()
       if (compositor) compositor.render(t)
       else renderScene(ctx, scene, { width: size.width, height: size.height, t })
+      sampleAmbient(compositor ? glCanvas : canvas)
       total += performance.now() - started
       if (++frames === 30) {
         onRendered(total / frames)
@@ -246,7 +264,7 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [playing, scene, size, loopMs, onRendered, isCycle, showTime])
+  }, [playing, scene, size, loopMs, onRendered, isCycle, showTime, sampleAmbient])
 
   const toggle = () => {
     clearTimeout(commitTimer.current)
@@ -299,6 +317,7 @@ export function Stage({ scene, cycle, onRendered, header, children }: StageProps
         {header}
       </div>
       <div className="stage-canvas" ref={wrapRef}>
+        <canvas ref={ambientRef} className="ambient" width={64} height={Math.round(64 / scene.aspect)} />
         <canvas ref={canvasRef} hidden={isCycle ? cycleVisible : playing && glActive} />
         <canvas ref={glCanvasRef} hidden={!(playing && !isCycle && glActive)} />
         <canvas ref={cycleCanvasRef} hidden={!cycleVisible} />

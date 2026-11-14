@@ -173,12 +173,7 @@ export function App() {
   const stripHeight = 176
   const stripWidth = Math.round(stripHeight * ASPECTS[state.aspect])
   const { anchors } = scene.palette
-  const glow = {
-    '--glow-sky': css(anchors.skyHorizon),
-    '--glow-sun': css(anchors.sun),
-    '--glow-ink': css(anchors.ink),
-    '--aspect': scene.aspect,
-  } as CSSProperties
+  const glow = { '--glow-ink': css(anchors.ink), '--aspect': scene.aspect } as CSSProperties
   const meta = [state.cycle ? 'day cycle' : scene.palette.mood, state.loop === 'pan' ? 'panning' : undefined, `seed ${state.seed}`].filter(Boolean).join(' · ')
 
   return (
